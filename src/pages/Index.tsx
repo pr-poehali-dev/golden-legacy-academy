@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
+import EditableText, { useContent, contentManager } from "@/components/EditableText";
 
 const AUTH_URL = "https://functions.poehali.dev/e6da7fcf-5b58-4d23-bcb3-2e96a22c0726";
 const ADMIN_URL = "https://functions.poehali.dev/1766177a-c2da-45c4-ab5b-e61d5b8f9608";
@@ -78,6 +79,7 @@ export default function Index() {
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
     if (token) loadProfile(token);
+    contentManager.load();
   }, [loadProfile]);
 
   const handleLogout = async () => {
@@ -177,12 +179,12 @@ export default function Index() {
       </header>
 
       <main className="relative">
-        {page === "home" && <HomePage setPage={setPage} setShowLogin={setShowLogin} isLoggedIn={isLoggedIn} />}
-        {page === "grounds" && <GroundsPage isLoggedIn={isLoggedIn} setShowLogin={setShowLogin} profile={profile} />}
+        {page === "home" && <HomePage setPage={setPage} setShowLogin={setShowLogin} isLoggedIn={isLoggedIn} isAdmin={!!profile?.user.is_admin} />}
+        {page === "grounds" && <GroundsPage isLoggedIn={isLoggedIn} setShowLogin={setShowLogin} profile={profile} isAdmin={!!profile?.user.is_admin} />}
         {page === "cabinet" && isLoggedIn && profile && <CabinetPage profile={profile} />}
         {page === "progress" && isLoggedIn && profile && <ProgressPage profile={profile} />}
         {page === "club" && isLoggedIn && profile && <ClubPage profile={profile} />}
-        {page === "contacts" && <ContactsPage />}
+        {page === "contacts" && <ContactsPage isAdmin={!!profile?.user.is_admin} />}
       </main>
 
       {showLogin && (
@@ -215,7 +217,8 @@ export default function Index() {
 // ─── HOME PAGE ────────────────────────────────────────────────────────────────
 const HERO_IMG = "https://cdn.poehali.dev/projects/e7a92d70-13fa-4fe1-b427-04d5de72d5d4/bucket/8509dc14-455a-411c-8604-21de621dfba8.jpg";
 
-function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) => void; setShowLogin: (v: boolean) => void; isLoggedIn: boolean }) {
+function HomePage({ setPage, setShowLogin, isLoggedIn, isAdmin }: { setPage: (p: Page) => void; setShowLogin: (v: boolean) => void; isLoggedIn: boolean; isAdmin: boolean }) {
+  useContent();
   return (
     <div>
       {/* HERO — split layout */}
@@ -227,26 +230,37 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
             <div className="mb-6 flex items-center gap-4">
               <img src={LOGO_IMG} alt="Золотое Наследие" className="w-16 h-16 rounded-full object-cover object-center border border-amber-700/30"
                 style={{ boxShadow: "0 0 24px rgba(180,140,30,0.2)" }} />
-              <span className="status-badge border border-amber-700/40" style={{ color: "hsl(40,70%,55%)" }}>✦ Академия Наставничества ✦</span>
+              <EditableText contentKey="hero_badge" fallback="✦ Академия Наставничества ✦" isAdmin={isAdmin}
+                as="span" className="status-badge border border-amber-700/40" style={{ color: "hsl(40,70%,55%)" }} />
             </div>
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-light mb-6 leading-tight animate-fade-in">
-              <span className="gold-text-gradient">Золотое</span><br />
-              <span className="text-foreground/90">Наследие</span>
+              <EditableText contentKey="hero_title_line1" fallback="Золотое" isAdmin={isAdmin}
+                as="span" className="gold-text-gradient block" /><br />
+              <EditableText contentKey="hero_title_line2" fallback="Наследие" isAdmin={isAdmin}
+                as="span" className="text-foreground/90" />
             </h1>
             <div className="divider-gold w-20 mb-6" />
-            <p className="font-body text-base text-muted-foreground leading-relaxed mb-10">
-              Пять ступеней мастерства, которые превратят ваш опыт в вечное наследие. Система наставничества, проверенная временем.
-            </p>
+            <EditableText contentKey="hero_subtitle" fallback="Пять ступеней мастерства, которые превратят ваш опыт в вечное наследие. Система наставничества, проверенная временем."
+              isAdmin={isAdmin} as="p" multiline className="font-body text-base text-muted-foreground leading-relaxed mb-10" />
             <div className="flex flex-col sm:flex-row gap-4">
-              <button onClick={() => setPage("grounds")} className="btn-gold px-8 py-3 rounded">Начать обучение</button>
-              {!isLoggedIn && <button onClick={() => setShowLogin(true)} className="btn-outline-gold px-8 py-3 rounded">Войти в кабинет</button>}
+              <EditableText contentKey="hero_btn_start" fallback="Начать обучение" isAdmin={isAdmin}
+                as="button" className="btn-gold px-8 py-3 rounded" onClick={() => setPage("grounds")} />
+              {!isLoggedIn && (
+                <EditableText contentKey="hero_btn_login" fallback="Войти в кабинет" isAdmin={isAdmin}
+                  as="button" className="btn-outline-gold px-8 py-3 rounded" onClick={() => setShowLogin(true)} />
+              )}
             </div>
 
             {/* Mini stats */}
             <div className="flex gap-8 mt-12 pt-8 border-t border-border/30">
-              {[{ value: "247", label: "Выпускников" }, { value: "5", label: "Ступеней" }, { value: "12", label: "Лет традиций" }].map((s) => (
+              {[
+                { ck: "stat_graduates", val: "247", label: "Выпускников" },
+                { ck: "stat_grounds", val: "5", label: "Ступеней" },
+                { ck: "stat_years", val: "12", label: "Лет традиций" },
+              ].map((s) => (
                 <div key={s.label}>
-                  <div className="font-display text-2xl font-light gold-text-gradient">{s.value}</div>
+                  <EditableText contentKey={s.ck} fallback={s.val} isAdmin={isAdmin}
+                    as="div" className="font-display text-2xl font-light gold-text-gradient" />
                   <div className="font-body text-[10px] text-muted-foreground uppercase tracking-wide">{s.label}</div>
                 </div>
               ))}
@@ -296,8 +310,10 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
       <section className="max-w-7xl mx-auto px-6 py-20">
         <div className="text-center mb-12">
           <div className="ornament mb-2">✦</div>
-          <h2 className="font-display text-4xl font-light mb-3">Пять Площадок Мастерства</h2>
-          <p className="font-body text-sm text-muted-foreground max-w-md mx-auto">Каждая ступень открывается после успешного завершения предыдущей</p>
+          <EditableText contentKey="grounds_section_title" fallback="Пять Площадок Мастерства" isAdmin={isAdmin}
+            as="h2" className="font-display text-4xl font-light mb-3" />
+          <EditableText contentKey="grounds_section_subtitle" fallback="Каждая ступень открывается после успешного завершения предыдущей"
+            isAdmin={isAdmin} as="p" className="font-body text-sm text-muted-foreground max-w-md mx-auto" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {GROUNDS.map((g, i) => (
@@ -306,7 +322,8 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
                 <Icon name={g.icon} size={18} className={i === 0 ? "text-stone-900" : "text-muted-foreground"} />
               </div>
               <div className="font-body text-[10px] tracking-widest text-muted-foreground uppercase mb-1">{i + 1} ступень</div>
-              <div className="font-display text-base font-medium mb-1" style={i === 0 ? { color: "hsl(45, 80%, 65%)" } : {}}>{g.title}</div>
+              <EditableText contentKey={`ground${g.id}_title`} fallback={g.title} isAdmin={isAdmin}
+                as="div" className="font-display text-base font-medium mb-1" style={i === 0 ? { color: "hsl(45, 80%, 65%)" } : {}} />
               {i > 0 && <Icon name="Lock" size={12} className="mx-auto mt-1 text-muted-foreground/40" />}
             </div>
           ))}
@@ -331,9 +348,8 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
                 <div className="absolute bottom-0 inset-x-0 p-5"
                   style={{ background: "linear-gradient(to top, rgba(6,14,9,0.92) 0%, transparent 100%)" }}>
                   <div className="ornament text-sm mb-1">✦</div>
-                  <div className="font-display text-lg font-light" style={{ color: "hsl(45, 85%, 70%)" }}>
-                    Пространство, созданное для роста
-                  </div>
+                  <EditableText contentKey="about_img_caption" fallback="Пространство, созданное для роста"
+                    isAdmin={isAdmin} as="div" className="font-display text-lg font-light" style={{ color: "hsl(45, 85%, 70%)" }} />
                   <div className="font-body text-xs text-muted-foreground mt-0.5 tracking-wide">
                     Академия наставничества · с 2014 года
                   </div>
@@ -344,13 +360,12 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
             <div className="flex-1">
               <div className="ornament mb-3">✦</div>
               <h2 className="font-display text-4xl lg:text-5xl font-light mb-4 leading-tight">
-                Место, где опыт<br />
-                <span className="gold-text-gradient">становится наследием</span>
+                <EditableText contentKey="about_title_line1" fallback="Место, где опыт" isAdmin={isAdmin} as="span" /><br />
+                <EditableText contentKey="about_title_line2" fallback="становится наследием" isAdmin={isAdmin} as="span" className="gold-text-gradient" />
               </h2>
               <div className="divider-gold w-20 mb-5" />
-              <p className="font-body text-sm text-muted-foreground leading-relaxed mb-6 max-w-lg">
-                Мы создали систему, в которой каждый эксперт может структурировать свои знания, передать их следующему поколению и оставить след, который будет жить в людях.
-              </p>
+              <EditableText contentKey="about_text" fallback="Мы создали систему, в которой каждый эксперт может структурировать свои знания, передать их следующему поколению и оставить след, который будет жить в людях."
+                isAdmin={isAdmin} as="p" multiline className="font-body text-sm text-muted-foreground leading-relaxed mb-6 max-w-lg" />
               <div className="space-y-4">
                 {[
                   { icon: "Award", title: "Сертификаты", desc: "Именной документ после каждой из пяти ступеней" },
@@ -411,12 +426,13 @@ const GROUND_PROGRAMS: Record<number, { week: string; topic: string }[]> = {
 };
 
 // ─── GROUNDS PAGE ─────────────────────────────────────────────────────────────
-function GroundsPage({ isLoggedIn, setShowLogin, profile }: { isLoggedIn: boolean; setShowLogin: (v: boolean) => void; profile: ProfileData | null }) {
+function GroundsPage({ isLoggedIn, setShowLogin, profile, isAdmin }: { isLoggedIn: boolean; setShowLogin: (v: boolean) => void; profile: ProfileData | null; isAdmin: boolean }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [programModal, setProgramModal] = useState<number | null>(null);
   const [startModal, setStartModal] = useState<number | null>(null);
   const [starting, setStarting] = useState(false);
   const completedGrounds = profile?.completedGrounds ?? 0;
+  useContent(); // подписываемся на обновления контента
 
   const handleStartGround = async (groundId: number) => {
     const token = localStorage.getItem(TOKEN_KEY);
@@ -457,8 +473,10 @@ function GroundsPage({ isLoggedIn, setShowLogin, profile }: { isLoggedIn: boolea
                     <span className="font-body text-[10px] tracking-widest text-muted-foreground uppercase">Площадка {g.id}</span>
                     {inProgress && <span className="status-badge bg-amber-900/30 border border-amber-700/30 text-amber-600/80 text-[9px]">В процессе</span>}
                   </div>
-                  <div className="font-display text-xl font-medium" style={isAvailable ? { color: "hsl(45, 80%, 68%)" } : {}}>{g.title}</div>
-                  <div className="font-body text-xs text-muted-foreground">{g.subtitle}</div>
+                  <EditableText contentKey={`ground${g.id}_title`} fallback={g.title} isAdmin={isAdmin}
+                    as="div" className="font-display text-xl font-medium" style={isAvailable ? { color: "hsl(45, 80%, 68%)" } : {}} />
+                  <EditableText contentKey={`ground${g.id}_subtitle`} fallback={g.subtitle} isAdmin={isAdmin}
+                    as="div" className="font-body text-xs text-muted-foreground" />
                 </div>
                 <div className="hidden sm:flex items-center gap-4 text-muted-foreground">
                   <div className="text-center"><div className="font-display text-base font-medium text-foreground/60">{g.modules}</div><div className="font-body text-[10px] uppercase tracking-wide">модулей</div></div>
@@ -468,7 +486,8 @@ function GroundsPage({ isLoggedIn, setShowLogin, profile }: { isLoggedIn: boolea
               </button>
               {isOpen && (
                 <div className="border-t border-border/40 p-5 sm:p-6 animate-fade-in">
-                  <p className="font-body text-sm text-muted-foreground leading-relaxed mb-5">{g.description}</p>
+                  <EditableText contentKey={`ground${g.id}_description`} fallback={g.description} isAdmin={isAdmin}
+                    as="p" multiline className="font-body text-sm text-muted-foreground leading-relaxed mb-5" />
                   <div className="flex flex-col sm:flex-row gap-3">
                     {isAvailable ? (
                       <>
@@ -1006,7 +1025,13 @@ function ClubPage({ profile }: { profile: ProfileData }) {
 }
 
 // ─── CONTACTS PAGE ────────────────────────────────────────────────────────────
-function ContactsPage() {
+function ContactsPage({ isAdmin }: { isAdmin: boolean }) {
+  const contacts = [
+    { icon: "Mail", label: "Email", ck: "contacts_email", fallback: "info@zolotoe-nasledie.ru" },
+    { icon: "Phone", label: "Телефон", ck: "contacts_phone", fallback: "+7 (800) 000-00-00" },
+    { icon: "MapPin", label: "Адрес", ck: "contacts_address", fallback: "Москва, ул. Примерная, 1" },
+    { icon: "MessageCircle", label: "Telegram", ck: "contacts_telegram", fallback: "@zolotoe_nasledie" },
+  ];
   return (
     <div className="max-w-4xl mx-auto px-6 py-16">
       <div className="text-center mb-12">
@@ -1015,17 +1040,13 @@ function ContactsPage() {
         <p className="font-body text-sm text-muted-foreground max-w-sm mx-auto">Мы рады ответить на ваши вопросы о программах обучения</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        {[
-          { icon: "Mail", label: "Email", value: "info@zolotoe-nasledie.ru" },
-          { icon: "Phone", label: "Телефон", value: "+7 (800) 000-00-00" },
-          { icon: "MapPin", label: "Адрес", value: "Москва, ул. Примерная, 1" },
-          { icon: "MessageCircle", label: "Telegram", value: "@zolotoe_nasledie" },
-        ].map((c) => (
+        {contacts.map((c) => (
           <div key={c.label} className="card-luxury rounded-lg p-5 flex items-center gap-4 hover:scale-[1.01] transition-all">
             <div className="w-10 h-10 rounded gold-gradient flex items-center justify-center flex-shrink-0"><Icon name={c.icon} size={16} className="text-stone-900" /></div>
             <div>
               <div className="font-body text-xs text-muted-foreground uppercase tracking-wide">{c.label}</div>
-              <div className="font-body text-sm text-foreground/80">{c.value}</div>
+              <EditableText contentKey={c.ck} fallback={c.fallback} isAdmin={isAdmin}
+                as="div" className="font-body text-sm text-foreground/80" />
             </div>
           </div>
         ))}
@@ -1047,7 +1068,8 @@ function ContactsPage() {
             <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">Сообщение</label>
             <textarea rows={4} placeholder="Расскажите о вашем запросе..." className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60 transition-colors resize-none" />
           </div>
-          <button className="btn-gold w-full py-3 rounded">Отправить сообщение</button>
+          <EditableText contentKey="contact_btn_send" fallback="Отправить сообщение" isAdmin={isAdmin}
+            as="button" className="btn-gold w-full py-3 rounded" />
         </div>
       </div>
     </div>
