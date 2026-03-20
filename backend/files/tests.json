@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "List files (public)",
+      "method": "GET",
+      "path": "/?action=list",
+      "expectedStatus": 200,
+      "expectedBody": {"files": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

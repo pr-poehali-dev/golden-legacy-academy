@@ -4,6 +4,8 @@ import EditableText, { useContent, contentManager } from "@/components/EditableT
 
 const AUTH_URL = "https://functions.poehali.dev/e6da7fcf-5b58-4d23-bcb3-2e96a22c0726";
 const ADMIN_URL = "https://functions.poehali.dev/1766177a-c2da-45c4-ab5b-e61d5b8f9608";
+const FILES_URL = "https://functions.poehali.dev/69dd48ae-c01f-4f36-86f5-41e309f27990";
+const PROGRESS_URL = "https://functions.poehali.dev/e7bff3a3-d4dd-475e-997b-18688a92ac19";
 const TOKEN_KEY = "gn_session_token";
 const LOGO_IMG = "https://cdn.poehali.dev/projects/e7a92d70-13fa-4fe1-b427-04d5de72d5d4/bucket/104ffa8d-3640-40b5-858a-6ba7f7a2f794.jpg";
 
@@ -181,9 +183,9 @@ export default function Index() {
       <main className="relative">
         {page === "home" && <HomePage setPage={setPage} setShowLogin={setShowLogin} isLoggedIn={isLoggedIn} isAdmin={!!profile?.user.is_admin} />}
         {page === "grounds" && <GroundsPage isLoggedIn={isLoggedIn} setShowLogin={setShowLogin} profile={profile} isAdmin={!!profile?.user.is_admin} />}
-        {page === "cabinet" && isLoggedIn && profile && <CabinetPage profile={profile} />}
-        {page === "progress" && isLoggedIn && profile && <ProgressPage profile={profile} />}
-        {page === "club" && isLoggedIn && profile && <ClubPage profile={profile} />}
+        {page === "cabinet" && isLoggedIn && profile && <CabinetPage profile={profile} onProfileUpdate={loadProfile} isAdmin={!!profile?.user.is_admin} />}
+        {page === "progress" && isLoggedIn && profile && <ProgressPage profile={profile} onProfileUpdate={loadProfile} />}
+        {page === "club" && isLoggedIn && profile && <ClubPage profile={profile} isAdmin={!!profile?.user.is_admin} />}
         {page === "contacts" && <ContactsPage isAdmin={!!profile?.user.is_admin} />}
       </main>
 
@@ -747,10 +749,18 @@ function AdminPanel() {
 }
 
 // ─── CABINET PAGE ─────────────────────────────────────────────────────────────
-function CabinetPage({ profile }: { profile: ProfileData }) {
+function CabinetPage({ profile, onProfileUpdate, isAdmin: _isAdmin }: { profile: ProfileData; onProfileUpdate: (token: string) => void; isAdmin: boolean }) {
   const { user, progress, certificates, completedGrounds } = profile;
   const currentProgress = progress.find((p) => p.status === "active");
   const currentGround = currentProgress ? GROUNDS.find((g) => g.id === currentProgress.ground_id) : GROUNDS[0];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const tok = localStorage.getItem(TOKEN_KEY);
+      if (tok) onProfileUpdate(tok);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [onProfileUpdate]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -824,7 +834,24 @@ function CabinetPage({ profile }: { profile: ProfileData }) {
               )}
             </div>
           )}
-          <button className="btn-gold w-full py-3 rounded">Продолжить обучение</button>
+          {currentProgress && currentProgress.status === "active" ? (
+            <button
+              onClick={async () => {
+                const tok = localStorage.getItem(TOKEN_KEY) || "";
+                await fetch(`${PROGRESS_URL}?action=complete_module`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Session-Token": tok },
+                  body: JSON.stringify({ ground_id: currentProgress.ground_id, module_num: currentProgress.current_module }),
+                });
+                onProfileUpdate(tok);
+              }}
+              className="btn-gold w-full py-3 rounded"
+            >
+              Завершить модуль {currentProgress.current_module} →
+            </button>
+          ) : (
+            <div className="font-body text-xs text-center text-muted-foreground py-2">Нет активных площадок — перейдите в раздел «Площадки»</div>
+          )}
         </div>
 
         <div className="card-luxury rounded-lg p-6 lg:col-span-3">
@@ -857,8 +884,35 @@ function CabinetPage({ profile }: { profile: ProfileData }) {
 }
 
 // ─── PROGRESS PAGE ────────────────────────────────────────────────────────────
-function ProgressPage({ profile }: { profile: ProfileData }) {
+function ProgressPage({ profile, onProfileUpdate }: { profile: ProfileData; onProfileUpdate: (token: string) => void }) {
   const { progress, certificates, completedGrounds } = profile;
+  const [completing, setCompleting] = useState<number | null>(null);
+  const [notification, setNotification] = useState<{ msg: string; type: "success" | "info" | "level" } | null>(null);
+
+  const token = localStorage.getItem(TOKEN_KEY) || "";
+
+  const completeModule = async (groundId: number, moduleNum: number) => {
+    setCompleting(groundId);
+    setNotification(null);
+    try {
+      const res = await fetch(`${PROGRESS_URL}?action=complete_module`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Session-Token": token },
+        body: JSON.stringify({ ground_id: groundId, module_num: moduleNum }),
+      });
+      const d = await res.json();
+      if (d.cert_issued) {
+        setNotification({ msg: `🎓 Сертификат площадки получен! Вы перешли на ступень ${d.new_level_title}`, type: "level" });
+      } else if (d.level_up) {
+        setNotification({ msg: `⬆️ Поздравляем! Новый уровень: ${d.new_level_title}`, type: "level" });
+      } else if (d.success) {
+        setNotification({ msg: `✅ Модуль ${moduleNum} завершён. Прогресс: ${d.percent}%`, type: "success" });
+      }
+      onProfileUpdate(token);
+    } finally {
+      setCompleting(null);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -907,6 +961,13 @@ function ProgressPage({ profile }: { profile: ProfileData }) {
         ))}
       </div>
 
+      {notification && (
+        <div className={`mb-4 p-4 rounded-lg border font-body text-sm ${notification.type === "level" ? "bg-amber-900/20 border-amber-700/40 text-amber-400" : "bg-green-900/15 border-green-700/30 text-green-400"}`}>
+          {notification.msg}
+          <button onClick={() => setNotification(null)} className="ml-3 opacity-60 hover:opacity-100">×</button>
+        </div>
+      )}
+
       {progress.length > 0 ? (
         <div className="card-luxury rounded-lg p-6">
           <h3 className="font-display text-xl mb-4">Детали по площадкам</h3>
@@ -914,18 +975,35 @@ function ProgressPage({ profile }: { profile: ProfileData }) {
             {progress.map((p) => {
               const g = GROUNDS.find((gr) => gr.id === p.ground_id);
               if (!g) return null;
+              const isActive = p.status === "active";
               return (
-                <div key={p.ground_id} className="p-3 rounded bg-muted/10 border border-border/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-display text-sm font-medium" style={{ color: "hsl(45, 75%, 65%)" }}>{g.title}</div>
+                <div key={p.ground_id} className="p-4 rounded-lg bg-muted/10 border border-border/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: p.status === "completed" ? "linear-gradient(135deg, hsl(45,80%,55%), hsl(36,70%,42%))" : "rgba(200,160,40,0.12)" }}>
+                        <Icon name={p.status === "completed" ? "Award" : g.icon} size={14} className={p.status === "completed" ? "text-stone-900" : ""} style={isActive ? { color: "hsl(45,75%,60%)" } : {}} />
+                      </div>
+                      <div className="font-display text-sm font-medium" style={{ color: "hsl(45, 75%, 65%)" }}>{g.title}</div>
+                    </div>
                     <span className="font-body text-[10px] uppercase tracking-wide" style={{ color: p.status === "completed" ? "hsl(140, 60%, 50%)" : "hsl(45, 70%, 55%)" }}>
                       {p.status === "completed" ? "Завершено" : "В процессе"}
                     </span>
                   </div>
-                  <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden">
-                    <div className="h-full progress-bar-gold rounded-full" style={{ width: `${p.percent}%` }} />
+                  <div className="h-1.5 bg-muted/40 rounded-full overflow-hidden mb-1.5">
+                    <div className="h-full progress-bar-gold rounded-full transition-all duration-500" style={{ width: `${p.percent}%` }} />
                   </div>
-                  <div className="font-body text-xs text-muted-foreground mt-1">Модуль {p.current_module} из {p.total_modules} · {p.percent}%</div>
+                  <div className="flex items-center justify-between">
+                    <div className="font-body text-xs text-muted-foreground">Модуль {p.current_module} из {p.total_modules} · {p.percent}%</div>
+                    {isActive && (
+                      <button
+                        onClick={() => completeModule(p.ground_id, p.current_module)}
+                        disabled={completing === p.ground_id}
+                        className="btn-gold text-xs px-3 py-1.5 rounded disabled:opacity-40"
+                      >
+                        {completing === p.ground_id ? "Сохраняем..." : `Завершить модуль ${p.current_module}`}
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -942,8 +1020,200 @@ function ProgressPage({ profile }: { profile: ProfileData }) {
   );
 }
 
+// ─── DOCUMENTS LIBRARY ───────────────────────────────────────────────────────
+interface DocFile {
+  id: number;
+  ground_id: number;
+  title: string;
+  description: string;
+  file_url: string;
+  file_type: string;
+  file_size: number;
+  required_level: number;
+  created_at: string;
+}
+
+function DocumentsLibrary({ userLevel, isAdmin }: { userLevel: number; isAdmin: boolean }) {
+  const [files, setFiles] = useState<DocFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState("");
+  const [filterGround, setFilterGround] = useState<number>(0);
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadForm, setUploadForm] = useState({ title: "", description: "", ground_id: 0, required_level: 0, is_public: true });
+
+  const token = localStorage.getItem(TOKEN_KEY) || "";
+
+  const loadFiles = useCallback(async () => {
+    setLoading(true);
+    const url = filterGround ? `${FILES_URL}?action=list&ground_id=${filterGround}` : `${FILES_URL}?action=list`;
+    const res = await fetch(url, { headers: { "X-Session-Token": token } });
+    if (res.ok) { const d = await res.json(); setFiles(d.files || []); }
+    setLoading(false);
+  }, [token, filterGround]);
+
+  useEffect(() => { loadFiles(); }, [loadFiles]);
+
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const fileInput = form.querySelector<HTMLInputElement>('input[type="file"]');
+    if (!fileInput?.files?.[0]) { setUploadMsg("Выберите файл"); return; }
+    const file = fileInput.files[0];
+    if (file.size > 10 * 1024 * 1024) { setUploadMsg("Файл не должен превышать 10 МБ"); return; }
+
+    setUploading(true); setUploadMsg("");
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = (reader.result as string).split(",")[1];
+      const res = await fetch(`${FILES_URL}?action=upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Session-Token": token },
+        body: JSON.stringify({ ...uploadForm, file_data: base64, file_name: file.name }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setUploadMsg("Файл загружен!");
+        setShowUpload(false);
+        loadFiles();
+      } else {
+        setUploadMsg(d.error || "Ошибка загрузки");
+      }
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const deleteFile = async (id: number) => {
+    if (!confirm("Удалить файл?")) return;
+    await fetch(`${FILES_URL}?action=delete&id=${id}`, { method: "DELETE", headers: { "X-Session-Token": token } });
+    loadFiles();
+  };
+
+  const fileIcon = (type: string) => {
+    if (type === "image") return "Image";
+    if (type === "video") return "Video";
+    return "FileText";
+  };
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} Б`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} КБ`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  };
+
+  return (
+    <div className="card-luxury rounded-lg p-6 mt-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded gold-gradient flex items-center justify-center">
+            <Icon name="FolderOpen" size={15} className="text-stone-900" />
+          </div>
+          <h3 className="font-display text-xl" style={{ color: "hsl(45, 80%, 65%)" }}>Библиотека материалов</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={filterGround}
+            onChange={(e) => setFilterGround(Number(e.target.value))}
+            className="bg-muted/20 border border-border/50 rounded px-2 py-1 font-body text-xs text-foreground/70 focus:outline-none"
+          >
+            <option value={0}>Все площадки</option>
+            {GROUNDS.map(g => <option key={g.id} value={g.id}>Площадка {g.id}</option>)}
+          </select>
+          {isAdmin && (
+            <button onClick={() => setShowUpload(!showUpload)} className="btn-gold text-xs px-3 py-1.5 rounded">
+              <Icon name="Upload" size={12} className="inline mr-1" />Загрузить
+            </button>
+          )}
+        </div>
+      </div>
+
+      {uploadMsg && <div className="mb-3 p-2 rounded bg-green-900/15 border border-green-700/20 font-body text-xs text-green-400">{uploadMsg}</div>}
+
+      {showUpload && isAdmin && (
+        <form onSubmit={handleUpload} className="mb-5 p-4 rounded-lg border border-amber-800/30 bg-amber-900/5 space-y-3">
+          <div className="font-display text-base mb-2" style={{ color: "hsl(45, 75%, 65%)" }}>Загрузить файл</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input required value={uploadForm.title} onChange={e => setUploadForm(f => ({ ...f, title: e.target.value }))}
+              placeholder="Название файла" className="bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm text-foreground focus:outline-none focus:border-amber-700/60" />
+            <select value={uploadForm.ground_id} onChange={e => setUploadForm(f => ({ ...f, ground_id: Number(e.target.value) }))}
+              className="bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm text-foreground/70 focus:outline-none">
+              <option value={0}>Общий (без площадки)</option>
+              {GROUNDS.map(g => <option key={g.id} value={g.id}>{g.title}</option>)}
+            </select>
+          </div>
+          <input value={uploadForm.description} onChange={e => setUploadForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="Описание (необязательно)" className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm text-foreground focus:outline-none focus:border-amber-700/60" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <select value={uploadForm.required_level} onChange={e => setUploadForm(f => ({ ...f, required_level: Number(e.target.value) }))}
+              className="bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm text-foreground/70 focus:outline-none">
+              <option value={0}>Доступен всем</option>
+              <option value={1}>Уровень 1+</option>
+              <option value={2}>Уровень 2+</option>
+              <option value={3}>Уровень 3+</option>
+              <option value={4}>Уровень 4+</option>
+              <option value={5}>Только Мастера</option>
+            </select>
+            <input type="file" required accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.mp4" className="font-body text-xs text-muted-foreground file:mr-2 file:py-1 file:px-2 file:rounded file:border file:border-amber-700/40 file:text-amber-600 file:text-xs file:bg-transparent" />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={uploading} className="btn-gold px-4 py-2 rounded text-sm disabled:opacity-50">{uploading ? "Загружаем..." : "Загрузить"}</button>
+            <button type="button" onClick={() => setShowUpload(false)} className="px-4 py-2 rounded text-sm border border-border/40 font-body text-muted-foreground hover:text-foreground transition-colors">Отмена</button>
+          </div>
+        </form>
+      )}
+
+      {loading ? (
+        <div className="font-body text-sm text-muted-foreground py-4">Загружаем материалы...</div>
+      ) : files.length === 0 ? (
+        <div className="text-center py-8">
+          <Icon name="FolderOpen" size={28} className="mx-auto mb-2 opacity-30" />
+          <p className="font-body text-sm text-muted-foreground">Материалов пока нет{isAdmin ? " — загрузите первый!" : ""}</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {files.map((f) => {
+            const hasAccess = userLevel >= f.required_level;
+            return (
+              <div key={f.id} className={`p-3 rounded-lg border transition-all ${hasAccess ? "border-border/40 bg-muted/10 hover:border-amber-800/40" : "border-border/20 bg-muted/5 opacity-60"}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded flex items-center justify-center flex-shrink-0 ${hasAccess ? "gold-gradient" : "bg-muted/30"}`}>
+                    <Icon name={fileIcon(f.file_type)} size={14} className={hasAccess ? "text-stone-900" : "text-muted-foreground/40"} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-body text-sm font-medium truncate" style={hasAccess ? { color: "hsl(45, 75%, 65%)" } : {}}>{f.title}</div>
+                    {f.description && <div className="font-body text-xs text-muted-foreground truncate">{f.description}</div>}
+                    <div className="flex items-center gap-2 mt-1">
+                      {f.ground_id > 0 && <span className="font-body text-[10px] text-muted-foreground">Площадка {f.ground_id}</span>}
+                      <span className="font-body text-[10px] text-muted-foreground">{formatSize(f.file_size)}</span>
+                      {f.required_level > 0 && <span className="font-body text-[10px] text-amber-600/70">Ур. {f.required_level}+</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {hasAccess && (
+                      <a href={f.file_url} target="_blank" rel="noreferrer" className="p-1.5 rounded hover:bg-amber-900/20 transition-colors" title="Открыть">
+                        <Icon name="ExternalLink" size={13} style={{ color: "hsl(45, 70%, 55%)" }} />
+                      </a>
+                    )}
+                    {!hasAccess && <Icon name="Lock" size={14} className="text-muted-foreground/30" />}
+                    {isAdmin && (
+                      <button onClick={() => deleteFile(f.id)} className="p-1.5 rounded hover:bg-red-900/20 transition-colors text-muted-foreground/40 hover:text-red-400">
+                        <Icon name="Trash2" size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── CLUB PAGE ────────────────────────────────────────────────────────────────
-function ClubPage({ profile }: { profile: ProfileData }) {
+function ClubPage({ profile, isAdmin }: { profile: ProfileData; isAdmin: boolean }) {
   const { user } = profile;
 
   return (
@@ -1020,6 +1290,9 @@ function ClubPage({ profile }: { profile: ProfileData }) {
           ))}
         </div>
       </div>
+
+      {/* Хранилище документов */}
+      <DocumentsLibrary userLevel={user.level} isAdmin={isAdmin} />
     </div>
   );
 }
