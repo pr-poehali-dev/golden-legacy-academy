@@ -108,7 +108,7 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: `radial-gradient(ellipse at 20% 50%, rgba(180,140,40,0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(180,140,40,0.04) 0%, transparent 40%)` }} />
+        <div className="absolute inset-0 opacity-30" style={{ backgroundImage: `radial-gradient(ellipse at 20% 50%, rgba(60,100,60,0.12) 0%, transparent 50%), radial-gradient(ellipse at 80% 20%, rgba(180,140,40,0.05) 0%, transparent 40%)` }} />
       </div>
 
       {/* HEADER */}
@@ -256,10 +256,10 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
         <div className="hidden lg:block absolute right-0 top-0 w-1/2 h-full">
           {/* Fade overlay left edge */}
           <div className="absolute inset-y-0 left-0 w-32 z-10"
-            style={{ background: "linear-gradient(to right, hsl(20,14%,6%) 0%, transparent 100%)" }} />
+            style={{ background: "linear-gradient(to right, hsl(150,18%,6%) 0%, transparent 100%)" }} />
           {/* Fade overlay bottom */}
           <div className="absolute inset-x-0 bottom-0 h-32 z-10"
-            style={{ background: "linear-gradient(to top, hsl(20,14%,6%) 0%, transparent 100%)" }} />
+            style={{ background: "linear-gradient(to top, hsl(150,18%,6%) 0%, transparent 100%)" }} />
           <img
             src={HERO_IMG}
             alt="Академия Золотое Наследие"
@@ -274,7 +274,7 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
         {/* Mobile bg image */}
         <div className="lg:hidden absolute inset-0 z-0">
           <img src={HERO_IMG} alt="" className="w-full h-full object-cover object-center opacity-15" />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(16,12,8,0.6) 0%, rgba(16,12,8,0.95) 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(8,18,12,0.6) 0%, rgba(8,18,12,0.95) 100%)" }} />
         </div>
       </section>
 
@@ -327,7 +327,7 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
                 <div className="absolute inset-0 rounded-xl" style={{ boxShadow: "inset 0 0 0 1px rgba(180,140,40,0.3)" }} />
                 {/* Bottom overlay with tagline */}
                 <div className="absolute bottom-0 inset-x-0 p-5"
-                  style={{ background: "linear-gradient(to top, rgba(10,8,5,0.9) 0%, transparent 100%)" }}>
+                  style={{ background: "linear-gradient(to top, rgba(6,14,9,0.92) 0%, transparent 100%)" }}>
                   <div className="ornament text-sm mb-1">✦</div>
                   <div className="font-display text-lg font-light" style={{ color: "hsl(45, 85%, 70%)" }}>
                     Пространство, созданное для роста
