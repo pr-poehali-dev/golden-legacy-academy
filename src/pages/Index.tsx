@@ -9,7 +9,31 @@ const PROGRESS_URL = "https://functions.poehali.dev/e7bff3a3-d4dd-475e-997b-1868
 const TOKEN_KEY = "gn_session_token";
 const LOGO_IMG = "https://cdn.poehali.dev/projects/e7a92d70-13fa-4fe1-b427-04d5de72d5d4/bucket/104ffa8d-3640-40b5-858a-6ba7f7a2f794.jpg";
 
-type Page = "home" | "grounds" | "cabinet" | "progress" | "club" | "contacts";
+type Page = "home" | "grounds" | "cabinet" | "progress" | "club" | "contacts" | "archive" | "course";
+
+interface CourseMaterial {
+  id: number;
+  ground_id: number;
+  type: "video" | "text" | "task" | "file" | "link";
+  title: string;
+  description: string;
+  content_url: string;
+  content_data: string;
+  sort_order: number;
+}
+
+interface ArchiveStats {
+  completed_grounds: number;
+  certificates_count: number;
+  total_modules_done: number;
+  active_grounds_count: number;
+}
+
+interface ActionLog {
+  action: string;
+  details: string;
+  created_at: string;
+}
 
 interface UserData {
   id: number;
@@ -19,6 +43,14 @@ interface UserData {
   level: number;
   is_admin: boolean;
   created_at: string;
+  phone?: string;
+  country?: string;
+  bio?: string;
+  goals?: string;
+  social_linkedin?: string;
+  social_telegram?: string;
+  notify_email?: boolean;
+  notify_push?: boolean;
 }
 
 interface ProfileData {
@@ -60,10 +92,16 @@ function formatDate(iso: string) {
 
 export default function Index() {
   const [page, setPage] = useState<Page>("home");
+  const [activeCourseId, setActiveCourseId] = useState<number>(1);
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [showLogin, setShowLogin] = useState(false);
   const [mobileMenu, setMobileMenu] = useState(false);
   const isLoggedIn = !!profile;
+
+  const openCourse = (groundId: number) => {
+    setActiveCourseId(groundId);
+    setPage("course");
+  };
 
   const loadProfile = useCallback(async (token: string) => {
     const res = await fetch(`${AUTH_URL}?action=profile`, {
@@ -102,6 +140,7 @@ export default function Index() {
     { id: "grounds", label: "Площадки", icon: "LayoutGrid" },
     { id: "cabinet", label: "Кабинет", icon: "User", requireAuth: true },
     { id: "progress", label: "Прогресс", icon: "TrendingUp", requireAuth: true },
+    { id: "archive", label: "Архив", icon: "Archive", requireAuth: true },
     { id: "club", label: "Клуб", icon: "Shield", requireAuth: true },
     { id: "contacts", label: "Контакты", icon: "MessageCircle" },
   ];
@@ -181,12 +220,14 @@ export default function Index() {
       </header>
 
       <main className="relative">
-        {page === "home" && <HomePage setPage={setPage} setShowLogin={setShowLogin} isLoggedIn={isLoggedIn} isAdmin={!!profile?.user.is_admin} />}
-        {page === "grounds" && <GroundsPage isLoggedIn={isLoggedIn} setShowLogin={setShowLogin} profile={profile} isAdmin={!!profile?.user.is_admin} />}
-        {page === "cabinet" && isLoggedIn && profile && <CabinetPage profile={profile} onProfileUpdate={loadProfile} isAdmin={!!profile?.user.is_admin} />}
-        {page === "progress" && isLoggedIn && profile && <ProgressPage profile={profile} onProfileUpdate={loadProfile} />}
+        {page === "home" && <HomePage setPage={setPage} setShowLogin={setShowLogin} isLoggedIn={isLoggedIn} isAdmin={!!profile?.user.is_admin} openCourse={openCourse} />}
+        {page === "grounds" && <GroundsPage isLoggedIn={isLoggedIn} setShowLogin={setShowLogin} profile={profile} isAdmin={!!profile?.user.is_admin} openCourse={openCourse} />}
+        {page === "cabinet" && isLoggedIn && profile && <CabinetPage profile={profile} onProfileUpdate={loadProfile} isAdmin={!!profile?.user.is_admin} openCourse={openCourse} />}
+        {page === "progress" && isLoggedIn && profile && <ProgressPage profile={profile} onProfileUpdate={loadProfile} openCourse={openCourse} />}
+        {page === "archive" && isLoggedIn && profile && <ArchivePage profile={profile} />}
         {page === "club" && isLoggedIn && profile && <ClubPage profile={profile} isAdmin={!!profile?.user.is_admin} />}
         {page === "contacts" && <ContactsPage isAdmin={!!profile?.user.is_admin} />}
+        {page === "course" && <CoursePage groundId={activeCourseId} profile={profile} onProfileUpdate={loadProfile} setPage={setPage} />}
       </main>
 
       {showLogin && (
@@ -219,7 +260,7 @@ export default function Index() {
 // ─── HOME PAGE ────────────────────────────────────────────────────────────────
 const HERO_IMG = "https://cdn.poehali.dev/projects/e7a92d70-13fa-4fe1-b427-04d5de72d5d4/bucket/8509dc14-455a-411c-8604-21de621dfba8.jpg";
 
-function HomePage({ setPage, setShowLogin, isLoggedIn, isAdmin }: { setPage: (p: Page) => void; setShowLogin: (v: boolean) => void; isLoggedIn: boolean; isAdmin: boolean }) {
+function HomePage({ setPage, setShowLogin, isLoggedIn, isAdmin, openCourse }: { setPage: (p: Page) => void; setShowLogin: (v: boolean) => void; isLoggedIn: boolean; isAdmin: boolean; openCourse: (id: number) => void }) {
   useContent();
   return (
     <div>
@@ -428,7 +469,7 @@ const GROUND_PROGRAMS: Record<number, { week: string; topic: string }[]> = {
 };
 
 // ─── GROUNDS PAGE ─────────────────────────────────────────────────────────────
-function GroundsPage({ isLoggedIn, setShowLogin, profile, isAdmin }: { isLoggedIn: boolean; setShowLogin: (v: boolean) => void; profile: ProfileData | null; isAdmin: boolean }) {
+function GroundsPage({ isLoggedIn, setShowLogin, profile, isAdmin, openCourse }: { isLoggedIn: boolean; setShowLogin: (v: boolean) => void; profile: ProfileData | null; isAdmin: boolean; openCourse: (id: number) => void }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [programModal, setProgramModal] = useState<number | null>(null);
   const [startModal, setStartModal] = useState<number | null>(null);
@@ -497,11 +538,10 @@ function GroundsPage({ isLoggedIn, setShowLogin, profile, isAdmin }: { isLoggedI
                           className="btn-gold px-6 py-2.5 rounded"
                           onClick={() => {
                             if (!isLoggedIn) { setShowLogin(true); return; }
-                            if (inProgress) return;
-                            setStartModal(g.id);
+                            openCourse(g.id);
                           }}
                         >
-                          {inProgress ? "✓ Обучение идёт" : "Начать площадку"}
+                          {inProgress ? "Продолжить курс" : "Открыть курс"}
                         </button>
                         <button className="btn-outline-gold px-6 py-2.5 rounded" onClick={() => setProgramModal(g.id)}>
                           Программа курса
@@ -519,6 +559,10 @@ function GroundsPage({ isLoggedIn, setShowLogin, profile, isAdmin }: { isLoggedI
             </div>
           );
         })}
+      </div>
+
+      <div className="mt-10">
+        <CourseMap profile={profile} openCourse={openCourse} />
       </div>
 
       {!isLoggedIn && (
@@ -566,9 +610,9 @@ function GroundsPage({ isLoggedIn, setShowLogin, profile, isAdmin }: { isLoggedI
                   </div>
                 ))}
               </div>
-              <button onClick={() => { setProgramModal(null); if (isLoggedIn) setStartModal(g.id); else setShowLogin(true); }}
+              <button onClick={() => { setProgramModal(null); if (isLoggedIn) openCourse(g.id); else setShowLogin(true); }}
                 className="btn-gold w-full py-3 rounded mt-5">
-                Начать эту площадку
+                Открыть курс
               </button>
             </div>
           </div>
@@ -749,8 +793,9 @@ function AdminPanel() {
 }
 
 // ─── CABINET PAGE ─────────────────────────────────────────────────────────────
-function CabinetPage({ profile, onProfileUpdate, isAdmin: _isAdmin }: { profile: ProfileData; onProfileUpdate: (token: string) => void; isAdmin: boolean }) {
+function CabinetPage({ profile, onProfileUpdate, isAdmin: _isAdmin, openCourse }: { profile: ProfileData; onProfileUpdate: (token: string) => void; isAdmin: boolean; openCourse: (id: number) => void }) {
   const { user, progress, certificates, completedGrounds } = profile;
+  const [showEditProfile, setShowEditProfile] = useState(false);
   const currentProgress = progress.find((p) => p.status === "active");
   const currentGround = currentProgress ? GROUNDS.find((g) => g.id === currentProgress.ground_id) : GROUNDS[0];
 
@@ -764,6 +809,17 @@ function CabinetPage({ profile, onProfileUpdate, isAdmin: _isAdmin }: { profile:
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
+      {showEditProfile && (
+        <EditProfileModal
+          profile={profile}
+          onClose={() => setShowEditProfile(false)}
+          onSaved={() => {
+            const tok = localStorage.getItem(TOKEN_KEY);
+            if (tok) onProfileUpdate(tok);
+          }}
+        />
+      )}
+
       <div className="mb-10">
         <div className="ornament mb-1">✦</div>
         <h1 className="font-display text-4xl font-light">Личный Кабинет</h1>
@@ -782,6 +838,7 @@ function CabinetPage({ profile, onProfileUpdate, isAdmin: _isAdmin }: { profile:
             <h2 className="font-display text-2xl font-medium mb-1" style={{ color: "hsl(45, 80%, 68%)" }}>{user.name}</h2>
             <span className="status-badge bg-amber-900/30 border border-amber-700/30 text-amber-600 text-[10px]">{user.status}</span>
             <div className="font-body text-xs text-muted-foreground mt-2">С нами с {formatDate(user.created_at)}</div>
+            {user.bio && <p className="font-body text-xs text-muted-foreground mt-2 leading-relaxed line-clamp-2">{user.bio}</p>}
           </div>
           <div className="divider-gold mb-4" />
           <div className="space-y-3">
@@ -799,6 +856,9 @@ function CabinetPage({ profile, onProfileUpdate, isAdmin: _isAdmin }: { profile:
               </div>
             ))}
           </div>
+          <button onClick={() => setShowEditProfile(true)} className="btn-outline-gold w-full py-2.5 rounded mt-4 text-xs flex items-center justify-center gap-2">
+            <Icon name="Pencil" size={13} />Редактировать профиль
+          </button>
         </div>
 
         <div className="card-luxury rounded-lg p-6 lg:col-span-2">
@@ -884,7 +944,7 @@ function CabinetPage({ profile, onProfileUpdate, isAdmin: _isAdmin }: { profile:
 }
 
 // ─── PROGRESS PAGE ────────────────────────────────────────────────────────────
-function ProgressPage({ profile, onProfileUpdate }: { profile: ProfileData; onProfileUpdate: (token: string) => void }) {
+function ProgressPage({ profile, onProfileUpdate, openCourse }: { profile: ProfileData; onProfileUpdate: (token: string) => void; openCourse: (id: number) => void }) {
   const { progress, certificates, completedGrounds } = profile;
   const [completing, setCompleting] = useState<number | null>(null);
   const [notification, setNotification] = useState<{ msg: string; type: "success" | "info" | "level" } | null>(null);
@@ -968,6 +1028,10 @@ function ProgressPage({ profile, onProfileUpdate }: { profile: ProfileData; onPr
         </div>
       )}
 
+      <div className="mb-6">
+        <CourseMap profile={profile} openCourse={openCourse} />
+      </div>
+
       {progress.length > 0 ? (
         <div className="card-luxury rounded-lg p-6">
           <h3 className="font-display text-xl mb-4">Детали по площадкам</h3>
@@ -994,15 +1058,20 @@ function ProgressPage({ profile, onProfileUpdate }: { profile: ProfileData; onPr
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="font-body text-xs text-muted-foreground">Модуль {p.current_module} из {p.total_modules} · {p.percent}%</div>
-                    {isActive && (
-                      <button
-                        onClick={() => completeModule(p.ground_id, p.current_module)}
-                        disabled={completing === p.ground_id}
-                        className="btn-gold text-xs px-3 py-1.5 rounded disabled:opacity-40"
-                      >
-                        {completing === p.ground_id ? "Сохраняем..." : `Завершить модуль ${p.current_module}`}
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => openCourse(p.ground_id)} className="btn-outline-gold text-xs px-3 py-1.5 rounded flex items-center gap-1">
+                        <Icon name="BookOpen" size={11} />Открыть
                       </button>
-                    )}
+                      {isActive && (
+                        <button
+                          onClick={() => completeModule(p.ground_id, p.current_module)}
+                          disabled={completing === p.ground_id}
+                          className="btn-gold text-xs px-3 py-1.5 rounded disabled:opacity-40"
+                        >
+                          {completing === p.ground_id ? "Сохраняем..." : `Завершить модуль ${p.current_module}`}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -1437,6 +1506,799 @@ function LoginModal({ onClose, onLogin }: { onClose: () => void; onLogin: (data:
           </button>
         </p>
       </div>
+    </div>
+  );
+}
+
+// ─── EDIT PROFILE MODAL ───────────────────────────────────────────────────────
+function EditProfileModal({ profile, onClose, onSaved }: { profile: ProfileData; onClose: () => void; onSaved: () => void }) {
+  const { user } = profile;
+  const [tab, setTab] = useState<"info" | "password">("info");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const [form, setForm] = useState({
+    name: user.name || "",
+    phone: user.phone || "",
+    country: user.country || "",
+    bio: user.bio || "",
+    goals: user.goals || "",
+    social_linkedin: user.social_linkedin || "",
+    social_telegram: user.social_telegram || "",
+    notify_email: user.notify_email !== false,
+    notify_push: user.notify_push === true,
+  });
+
+  const [pwd, setPwd] = useState({ current_password: "", new_password: "", confirm_password: "" });
+
+  const validate = () => {
+    if (!form.name.trim()) return "Введите имя";
+    if (form.name.trim().length < 2) return "Имя должно быть не менее 2 символов";
+    if (form.name.trim().length > 100) return "Имя не должно превышать 100 символов";
+    if (form.phone && !/^[+\d\s\-()]{7,20}$/.test(form.phone)) return "Неверный формат телефона";
+    if (form.bio.length > 1000) return "Описание не должно превышать 1000 символов";
+    if (form.goals.length > 500) return "Цели не должны превышать 500 символов";
+    if (form.social_telegram && !/^@?[\w]{3,}$/.test(form.social_telegram)) return "Telegram: например @username";
+    return "";
+  };
+
+  const validatePwd = () => {
+    if (!pwd.current_password) return "Введите текущий пароль";
+    if (!pwd.new_password) return "Введите новый пароль";
+    if (pwd.new_password.length < 6) return "Новый пароль не менее 6 символов";
+    if (pwd.new_password !== pwd.confirm_password) return "Пароли не совпадают";
+    if (pwd.new_password === pwd.current_password) return "Новый пароль должен отличаться";
+    return "";
+  };
+
+  const saveProfile = async () => {
+    const e = validate();
+    if (e) { setError(e); return; }
+    setError(""); setSaving(true); setSuccess("");
+    const token = localStorage.getItem(TOKEN_KEY) || "";
+    const res = await fetch(`${AUTH_URL}?action=update_profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify(form),
+    });
+    const d = await res.json();
+    setSaving(false);
+    if (!res.ok) { setError(d.error || "Ошибка сохранения"); return; }
+    setSuccess("Профиль обновлён!");
+    onSaved();
+  };
+
+  const savePassword = async () => {
+    const e = validatePwd();
+    if (e) { setError(e); return; }
+    setError(""); setSaving(true); setSuccess("");
+    const token = localStorage.getItem(TOKEN_KEY) || "";
+    const res = await fetch(`${AUTH_URL}?action=change_password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify(pwd),
+    });
+    const d = await res.json();
+    setSaving(false);
+    if (!res.ok) { setError(d.error || "Ошибка"); return; }
+    setSuccess("Пароль успешно изменён!");
+    setPwd({ current_password: "", new_password: "", confirm_password: "" });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative card-luxury rounded-lg w-full max-w-xl max-h-[90vh] overflow-y-auto animate-scale-in">
+        <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b border-border/40 px-6 py-4 flex items-center justify-between z-10">
+          <h2 className="font-display text-xl font-medium" style={{ color: "hsl(45, 80%, 65%)" }}>Редактировать профиль</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors"><Icon name="X" size={18} /></button>
+        </div>
+        <div className="flex border-b border-border/40 px-6">
+          {(["info", "password"] as const).map((t) => (
+            <button key={t} onClick={() => { setTab(t); setError(""); setSuccess(""); }}
+              className={`px-4 py-3 font-body text-xs uppercase tracking-wide border-b-2 transition-all ${tab === t ? "border-amber-600" : "border-transparent text-muted-foreground"}`}
+              style={tab === t ? { color: "hsl(45, 75%, 60%)" } : {}}
+            >{t === "info" ? "Данные профиля" : "Смена пароля"}</button>
+          ))}
+        </div>
+        <div className="p-6 space-y-4">
+          {tab === "info" && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">Имя *</label>
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    maxLength={100} placeholder="Ваше имя"
+                    className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60" />
+                  <span className="font-body text-[10px] text-muted-foreground/50">{form.name.length}/100</span>
+                </div>
+                <div>
+                  <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">Телефон</label>
+                  <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="+7 (999) 000-00-00"
+                    className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60" />
+                </div>
+              </div>
+              <div>
+                <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">Страна</label>
+                <input value={form.country} onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
+                  placeholder="Россия"
+                  className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60" />
+              </div>
+              <div>
+                <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">О себе</label>
+                <textarea value={form.bio} onChange={e => setForm(f => ({ ...f, bio: e.target.value }))}
+                  maxLength={1000} rows={3} placeholder="Расскажите о себе и вашем опыте..."
+                  className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60 resize-none" />
+                <span className="font-body text-[10px] text-muted-foreground/50">{form.bio.length}/1000</span>
+              </div>
+              <div>
+                <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">Цели обучения</label>
+                <textarea value={form.goals} onChange={e => setForm(f => ({ ...f, goals: e.target.value }))}
+                  maxLength={500} rows={2} placeholder="Чего вы хотите достичь..."
+                  className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60 resize-none" />
+                <span className="font-body text-[10px] text-muted-foreground/50">{form.goals.length}/500</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">LinkedIn</label>
+                  <input value={form.social_linkedin} onChange={e => setForm(f => ({ ...f, social_linkedin: e.target.value }))}
+                    placeholder="https://linkedin.com/in/..."
+                    className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60" />
+                </div>
+                <div>
+                  <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">Telegram</label>
+                  <input value={form.social_telegram} onChange={e => setForm(f => ({ ...f, social_telegram: e.target.value }))}
+                    placeholder="@username"
+                    className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60" />
+                </div>
+              </div>
+              <div className="flex items-center gap-6 pt-1">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.notify_email} onChange={e => setForm(f => ({ ...f, notify_email: e.target.checked }))} className="w-4 h-4 rounded" />
+                  <span className="font-body text-sm text-muted-foreground">Email-уведомления</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={form.notify_push} onChange={e => setForm(f => ({ ...f, notify_push: e.target.checked }))} className="w-4 h-4 rounded" />
+                  <span className="font-body text-sm text-muted-foreground">Push-уведомления</span>
+                </label>
+              </div>
+            </>
+          )}
+          {tab === "password" && (
+            <div className="space-y-4">
+              {["current_password", "new_password", "confirm_password"].map((key) => (
+                <div key={key}>
+                  <label className="font-body text-xs text-muted-foreground uppercase tracking-wide block mb-1.5">
+                    {key === "current_password" ? "Текущий пароль" : key === "new_password" ? "Новый пароль" : "Подтвердите новый пароль"}
+                  </label>
+                  <input type="password" value={pwd[key as keyof typeof pwd]}
+                    onChange={e => setPwd(p => ({ ...p, [key]: e.target.value }))}
+                    placeholder="••••••••"
+                    className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2.5 font-body text-sm text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-amber-700/60" />
+                </div>
+              ))}
+              <div className="text-xs text-muted-foreground space-y-1 p-3 rounded bg-muted/10 border border-border/30">
+                <div className={`flex items-center gap-1.5 ${pwd.new_password.length >= 6 ? "text-green-400" : ""}`}>
+                  <Icon name={pwd.new_password.length >= 6 ? "CheckCircle" : "Circle"} size={11} />
+                  <span>Не менее 6 символов</span>
+                </div>
+                <div className={`flex items-center gap-1.5 ${pwd.new_password && pwd.new_password === pwd.confirm_password ? "text-green-400" : ""}`}>
+                  <Icon name={pwd.new_password && pwd.new_password === pwd.confirm_password ? "CheckCircle" : "Circle"} size={11} />
+                  <span>Пароли совпадают</span>
+                </div>
+                <div className={`flex items-center gap-1.5 ${pwd.new_password && pwd.new_password !== pwd.current_password ? "text-green-400" : ""}`}>
+                  <Icon name={pwd.new_password && pwd.new_password !== pwd.current_password ? "CheckCircle" : "Circle"} size={11} />
+                  <span>Отличается от текущего</span>
+                </div>
+              </div>
+            </div>
+          )}
+          {error && <div className="p-3 rounded bg-red-900/15 border border-red-700/30 font-body text-sm text-red-400">{error}</div>}
+          {success && <div className="p-3 rounded bg-green-900/15 border border-green-700/30 font-body text-sm text-green-400">{success}</div>}
+          <div className="flex gap-3 pt-2">
+            <button onClick={tab === "info" ? saveProfile : savePassword} disabled={saving} className="btn-gold flex-1 py-3 rounded disabled:opacity-50">
+              {saving ? "Сохраняем..." : "Сохранить"}
+            </button>
+            <button onClick={onClose} className="px-5 py-3 rounded border border-border/40 font-body text-sm text-muted-foreground hover:text-foreground transition-colors">Отмена</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── COURSE PAGE ──────────────────────────────────────────────────────────────
+function CoursePage({ groundId, profile, onProfileUpdate, setPage }: {
+  groundId: number;
+  profile: ProfileData | null;
+  onProfileUpdate: (token: string) => void;
+  setPage: (p: Page) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<"overview" | "materials" | "tasks">("overview");
+  const [materials, setMaterials] = useState<CourseMaterial[]>([]);
+  const [courseInfo, setCourseInfo] = useState<{ is_available: boolean; progress: ProgressItem | null } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [notification, setNotification] = useState<{ msg: string; type: "success" | "level" } | null>(null);
+  const [editMat, setEditMat] = useState<Partial<CourseMaterial> | null>(null);
+
+  const token = localStorage.getItem(TOKEN_KEY) || "";
+  const ground = GROUNDS.find(g => g.id === groundId)!;
+  const isAdmin = !!profile?.user.is_admin;
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`${PROGRESS_URL}?action=get_materials&ground_id=${groundId}`, {
+      headers: { "X-Session-Token": token },
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setMaterials(d.materials || []);
+      setCourseInfo({ is_available: d.is_available, progress: d.progress });
+    }
+    setLoading(false);
+  }, [groundId, token]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const startGround = async () => {
+    setStarting(true);
+    const res = await fetch(`${PROGRESS_URL}?action=start_ground`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify({ ground_id: groundId }),
+    });
+    const d = await res.json();
+    setStarting(false);
+    if (res.ok) {
+      setNotification({ msg: d.message || "Площадка начата!", type: "success" });
+      load();
+      if (token) onProfileUpdate(token);
+    }
+  };
+
+  const completeModule = async () => {
+    if (!courseInfo?.progress) return;
+    setCompleting(true);
+    const res = await fetch(`${PROGRESS_URL}?action=complete_module`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify({ ground_id: groundId, module_num: courseInfo.progress.current_module }),
+    });
+    const d = await res.json();
+    setCompleting(false);
+    if (d.cert_issued) {
+      setNotification({ msg: `🎓 Сертификат получен! Уровень: ${d.new_level_title}`, type: "level" });
+    } else if (d.level_up) {
+      setNotification({ msg: `⬆️ Новый уровень: ${d.new_level_title}`, type: "level" });
+    } else if (d.success) {
+      setNotification({ msg: `✅ Модуль ${d.current_module - 1} завершён. Прогресс: ${d.percent}%`, type: "success" });
+    }
+    load();
+    if (token) onProfileUpdate(token);
+  };
+
+  const saveMaterial = async (mat: Partial<CourseMaterial>) => {
+    await fetch(`${PROGRESS_URL}?action=save_material`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify({ ...mat, ground_id: groundId }),
+    });
+    setEditMat(null);
+    load();
+  };
+
+  const deleteMaterial = async (id: number) => {
+    if (!confirm("Удалить материал?")) return;
+    await fetch(`${PROGRESS_URL}?action=delete_material&id=${id}`, { method: "DELETE", headers: { "X-Session-Token": token } });
+    load();
+  };
+
+  const matIcon = (type: string) => (({ video: "Video", text: "FileText", task: "CheckSquare", file: "Paperclip", link: "Link" } as Record<string, string>)[type] || "File");
+  const matColor = (type: string) => (({ video: "hsl(200,70%,60%)", text: "hsl(45,75%,60%)", task: "hsl(140,60%,55%)", file: "hsl(280,60%,65%)", link: "hsl(25,70%,60%)" } as Record<string, string>)[type] || "hsl(45,60%,55%)");
+
+  const videoMats = materials.filter(m => m.type === "video" || m.type === "text");
+  const taskMats = materials.filter(m => m.type === "task" || m.type === "file");
+
+  const prog = courseInfo?.progress;
+  const isStarted = !!prog;
+  const isCompleted = prog?.status === "completed";
+  const isActive = prog?.status === "active";
+  const isAvailable = courseInfo?.is_available !== false;
+
+  return (
+    <div className="max-w-5xl mx-auto px-6 py-12">
+      <button onClick={() => setPage("grounds")} className="flex items-center gap-2 font-body text-sm text-muted-foreground hover:text-foreground transition-colors mb-8">
+        <Icon name="ArrowLeft" size={16} />Назад к площадкам
+      </button>
+
+      {notification && (
+        <div className={`mb-6 p-4 rounded-lg border font-body text-sm flex items-center justify-between ${notification.type === "level" ? "bg-amber-900/20 border-amber-700/40 text-amber-400" : "bg-green-900/15 border-green-700/30 text-green-400"}`}>
+          {notification.msg}
+          <button onClick={() => setNotification(null)}><Icon name="X" size={14} /></button>
+        </div>
+      )}
+
+      <div className="card-luxury rounded-xl p-6 sm:p-8 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-6">
+          <div className="w-14 h-14 rounded-xl gold-gradient flex items-center justify-center flex-shrink-0">
+            <Icon name={ground.icon} size={24} className="text-stone-900" />
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-body text-xs text-muted-foreground uppercase tracking-wider">Площадка {ground.id} из 5</span>
+              {isCompleted && <span className="status-badge bg-green-900/20 border border-green-700/30 text-green-500 text-[10px]">Завершена</span>}
+              {isActive && <span className="status-badge bg-amber-900/20 border border-amber-700/30 text-amber-500 text-[10px]">В процессе</span>}
+            </div>
+            <h1 className="font-display text-3xl font-light mb-1" style={{ color: "hsl(45, 85%, 68%)" }}>{ground.title}</h1>
+            <p className="font-body text-sm text-muted-foreground">{ground.subtitle} · {ground.duration} · {ground.modules} модулей</p>
+          </div>
+        </div>
+
+        {prog && (
+          <div className="mb-4">
+            <div className="flex justify-between font-body text-xs text-muted-foreground mb-1.5">
+              <span>Прогресс: модуль {prog.current_module} из {prog.total_modules}</span>
+              <span style={{ color: "hsl(45, 70%, 60%)" }}>{prog.percent}%</span>
+            </div>
+            <div className="h-2 bg-muted/30 rounded-full overflow-hidden">
+              <div className="h-full progress-bar-gold rounded-full transition-all duration-700" style={{ width: `${prog.percent}%` }} />
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-3">
+          {!isStarted && profile && isAvailable && (
+            <button onClick={startGround} disabled={starting} className="btn-gold px-6 py-2.5 rounded disabled:opacity-50">
+              {starting ? "Запускаем..." : "Начать площадку"}
+            </button>
+          )}
+          {!isStarted && profile && !isAvailable && (
+            <div className="flex items-center gap-2 font-body text-sm text-muted-foreground">
+              <Icon name="Lock" size={14} />Сначала завершите площадку {groundId - 1}
+            </div>
+          )}
+          {isActive && (
+            <button onClick={completeModule} disabled={completing} className="btn-gold px-6 py-2.5 rounded disabled:opacity-50">
+              {completing ? "Сохраняем..." : `Завершить модуль ${prog!.current_module} →`}
+            </button>
+          )}
+          {isCompleted && (
+            <div className="flex items-center gap-2 font-body text-sm" style={{ color: "hsl(45, 75%, 60%)" }}>
+              <Icon name="Award" size={16} />Площадка завершена · Сертификат получен
+            </div>
+          )}
+          {!profile && <div className="font-body text-sm text-muted-foreground">Войдите, чтобы начать обучение</div>}
+          {isAdmin && (
+            <button onClick={() => setEditMat({ ground_id: groundId, type: "text", title: "", description: "", content_url: "", content_data: "", sort_order: materials.length + 1 })}
+              className="btn-outline-gold px-4 py-2 rounded text-sm flex items-center gap-2">
+              <Icon name="Plus" size={14} />Добавить материал
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex border-b border-border/40 mb-6 gap-1">
+        {([
+          { key: "overview", label: "Программа", icon: "LayoutList" },
+          { key: "materials", label: `Видео и тексты (${videoMats.length})`, icon: "Video" },
+          { key: "tasks", label: `Задания (${taskMats.length})`, icon: "CheckSquare" },
+        ] as const).map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
+            className={`flex items-center gap-2 px-4 py-3 font-body text-xs uppercase tracking-wide border-b-2 transition-all ${activeTab === t.key ? "border-amber-600" : "border-transparent text-muted-foreground"}`}
+            style={activeTab === t.key ? { color: "hsl(45, 75%, 60%)" } : {}}>
+            <Icon name={t.icon} size={13} />{t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading && <div className="text-center py-12 font-body text-sm text-muted-foreground">Загружаем материалы...</div>}
+
+      {!loading && activeTab === "overview" && (
+        <div className="space-y-3">
+          <p className="font-body text-sm text-muted-foreground leading-relaxed mb-6">{ground.description}</p>
+          {materials.map((m, i) => (
+            <div key={m.id} className="flex items-start gap-4 p-4 rounded-lg bg-muted/10 border border-border/30 hover:border-amber-800/40 transition-all group">
+              <div className="w-8 h-8 rounded flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "rgba(200,160,40,0.1)" }}>
+                <Icon name={matIcon(m.type)} size={14} style={{ color: matColor(m.type) }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-body text-[10px] uppercase tracking-wider text-muted-foreground">{i + 1}.</span>
+                  <div className="font-body text-sm font-medium text-foreground/90">{m.title}</div>
+                  <span className="font-body text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ color: matColor(m.type), backgroundColor: `${matColor(m.type)}22` }}>{m.type}</span>
+                </div>
+                {m.description && <div className="font-body text-xs text-muted-foreground mt-0.5">{m.description}</div>}
+              </div>
+              {isAdmin && (
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => setEditMat(m)} className="p-1.5 rounded hover:bg-amber-900/20"><Icon name="Pencil" size={12} style={{ color: "hsl(45,70%,55%)" }} /></button>
+                  <button onClick={() => deleteMaterial(m.id)} className="p-1.5 rounded hover:bg-red-900/20"><Icon name="Trash2" size={12} className="text-red-400/60" /></button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && activeTab === "materials" && (
+        <div className="space-y-4">
+          {videoMats.length === 0 && <div className="text-center py-10 font-body text-sm text-muted-foreground">Видео и текстовые материалы ещё не добавлены</div>}
+          {videoMats.map(m => (
+            <div key={m.id} className="card-luxury rounded-lg p-5 group">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.type === "video" ? "rgba(30,160,220,0.12)" : "rgba(200,160,40,0.1)" }}>
+                  <Icon name={m.type === "video" ? "PlayCircle" : "BookOpen"} size={20} style={{ color: matColor(m.type) }} />
+                </div>
+                <div className="flex-1">
+                  <div className="font-body text-sm font-medium mb-0.5">{m.title}</div>
+                  {m.description && <div className="font-body text-xs text-muted-foreground">{m.description}</div>}
+                  {m.content_url && (
+                    <a href={m.content_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-2 font-body text-xs" style={{ color: matColor(m.type) }}>
+                      <Icon name="ExternalLink" size={11} />{m.type === "video" ? "Смотреть" : "Читать"}
+                    </a>
+                  )}
+                  {m.content_data && <div className="mt-3 font-body text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap p-3 rounded bg-muted/10 border border-border/30">{m.content_data}</div>}
+                </div>
+                {isAdmin && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setEditMat(m)} className="p-1.5 rounded hover:bg-amber-900/20"><Icon name="Pencil" size={12} style={{ color: "hsl(45,70%,55%)" }} /></button>
+                    <button onClick={() => deleteMaterial(m.id)} className="p-1.5 rounded hover:bg-red-900/20"><Icon name="Trash2" size={12} className="text-red-400/60" /></button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && activeTab === "tasks" && (
+        <div className="space-y-4">
+          {taskMats.length === 0 && <div className="text-center py-10 font-body text-sm text-muted-foreground">Практические задания ещё не добавлены</div>}
+          {taskMats.map((m, i) => (
+            <div key={m.id} className="card-luxury rounded-lg p-5 group">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 font-body text-sm font-bold" style={{ background: "rgba(100,200,100,0.1)", color: "hsl(140,60%,55%)" }}>
+                  {i + 1}
+                </div>
+                <div className="flex-1">
+                  <div className="font-body text-sm font-medium mb-1">{m.title}</div>
+                  {m.description && <div className="font-body text-xs text-muted-foreground leading-relaxed">{m.description}</div>}
+                  {m.content_data && <div className="mt-3 font-body text-sm text-foreground/80 p-3 rounded bg-muted/10 border border-border/30">{m.content_data}</div>}
+                </div>
+                {isAdmin && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setEditMat(m)} className="p-1.5 rounded hover:bg-amber-900/20"><Icon name="Pencil" size={12} style={{ color: "hsl(45,70%,55%)" }} /></button>
+                    <button onClick={() => deleteMaterial(m.id)} className="p-1.5 rounded hover:bg-red-900/20"><Icon name="Trash2" size={12} className="text-red-400/60" /></button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editMat && isAdmin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setEditMat(null)} />
+          <div className="relative card-luxury rounded-lg p-6 w-full max-w-lg animate-scale-in">
+            <h3 className="font-display text-lg mb-4" style={{ color: "hsl(45, 75%, 65%)" }}>
+              {editMat.id ? "Редактировать материал" : "Новый материал"}
+            </h3>
+            <div className="space-y-3">
+              <input value={editMat.title || ""} onChange={e => setEditMat(m => ({ ...m!, title: e.target.value }))}
+                placeholder="Название" className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm focus:outline-none focus:border-amber-700/60" />
+              <select value={editMat.type || "text"} onChange={e => setEditMat(m => ({ ...m!, type: e.target.value as CourseMaterial["type"] }))}
+                className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm text-foreground/70 focus:outline-none">
+                {["video", "text", "task", "file", "link"].map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <textarea value={editMat.description || ""} onChange={e => setEditMat(m => ({ ...m!, description: e.target.value }))}
+                placeholder="Описание" rows={2} className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm resize-none focus:outline-none focus:border-amber-700/60" />
+              <input value={editMat.content_url || ""} onChange={e => setEditMat(m => ({ ...m!, content_url: e.target.value }))}
+                placeholder="URL (ссылка на видео, файл и т.д.)" className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm focus:outline-none focus:border-amber-700/60" />
+              <textarea value={editMat.content_data || ""} onChange={e => setEditMat(m => ({ ...m!, content_data: e.target.value }))}
+                placeholder="Текст материала (для текстовых блоков)" rows={3} className="w-full bg-muted/20 border border-border/50 rounded px-3 py-2 font-body text-sm resize-none focus:outline-none focus:border-amber-700/60" />
+              <div className="flex gap-3">
+                <button onClick={() => saveMaterial(editMat)} className="btn-gold flex-1 py-2 rounded text-sm">Сохранить</button>
+                <button onClick={() => setEditMat(null)} className="px-4 py-2 rounded border border-border/40 font-body text-sm text-muted-foreground hover:text-foreground">Отмена</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── COURSE MAP ───────────────────────────────────────────────────────────────
+function CourseMap({ profile, openCourse }: { profile: ProfileData | null; openCourse: (id: number) => void }) {
+  const progress = profile?.progress || [];
+
+  const getGroundState = (groundId: number) => {
+    const prog = progress.find(p => p.ground_id === groundId);
+    if (prog?.status === "completed") return "completed";
+    if (prog?.status === "active") return "active";
+    const prevCompleted = groundId === 1 || progress.some(p => p.ground_id === groundId - 1 && p.status === "completed");
+    if (prevCompleted) return "available";
+    return "locked";
+  };
+
+  return (
+    <div className="card-luxury rounded-xl p-6 sm:p-8">
+      <div className="flex items-center gap-3 mb-8">
+        <div className="w-8 h-8 rounded gold-gradient flex items-center justify-center">
+          <Icon name="Map" size={14} className="text-stone-900" />
+        </div>
+        <h3 className="font-display text-xl" style={{ color: "hsl(45, 80%, 65%)" }}>Карта курсов</h3>
+      </div>
+
+      <div className="relative">
+        <div className="hidden sm:block absolute left-1/2 top-8 bottom-8 w-px -translate-x-1/2" style={{ background: "linear-gradient(to bottom, transparent, hsl(45,50%,25%) 15%, hsl(45,50%,25%) 85%, transparent)" }} />
+
+        <div className="space-y-4 sm:space-y-8">
+          {GROUNDS.map((ground, idx) => {
+            const state = getGroundState(ground.id);
+            const prog = progress.find(p => p.ground_id === ground.id);
+            const isLeft = idx % 2 === 0;
+
+            return (
+              <div key={ground.id} className={`sm:grid sm:grid-cols-[1fr,auto,1fr] items-center gap-4`}>
+                <div className={isLeft ? "" : "sm:col-start-3"}>
+                  <div className={`card-luxury rounded-xl p-4 cursor-pointer transition-all duration-200 ${
+                    state === "locked" ? "opacity-40 cursor-not-allowed" :
+                    state === "completed" ? "border border-green-700/30 hover:border-green-600/50" :
+                    state === "active" ? "border border-amber-700/40 hover:border-amber-600/60" :
+                    "hover:border-amber-700/40"
+                  }`}
+                    onClick={() => state !== "locked" && openCourse(ground.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        state === "completed" ? "" :
+                        state === "active" ? "gold-gradient" :
+                        state === "available" ? "bg-amber-900/15 border border-amber-800/30" :
+                        "bg-muted/20"
+                      }`} style={state === "completed" ? { background: "rgba(50,160,70,0.2)", border: "1px solid rgba(50,160,70,0.3)" } : {}}>
+                        <Icon name={state === "completed" ? "CheckCircle" : state === "locked" ? "Lock" : ground.icon}
+                          size={16}
+                          className={state === "active" ? "text-stone-900" : ""}
+                          style={state === "completed" ? { color: "hsl(140,60%,55%)" } : state === "available" ? { color: "hsl(45,70%,55%)" } : {}}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-display text-sm font-medium truncate" style={state !== "locked" ? { color: "hsl(45, 75%, 65%)" } : {}}>{ground.title}</div>
+                        <div className="font-body text-[10px] text-muted-foreground">{ground.duration} · {ground.modules} мод.</div>
+                        {prog && (
+                          <div className="mt-1.5">
+                            <div className="h-1 bg-muted/30 rounded-full overflow-hidden">
+                              <div className="h-full progress-bar-gold rounded-full" style={{ width: `${prog.percent}%` }} />
+                            </div>
+                            <span className="font-body text-[9px] text-muted-foreground">{prog.percent}%</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={`hidden sm:flex w-10 h-10 rounded-full flex-shrink-0 items-center justify-center z-10 border-2 ${isLeft ? "" : "sm:col-start-2 sm:row-start-1"}`} style={{
+                  borderColor: state === "completed" ? "hsl(140,60%,45%)" : state === "active" ? "hsl(45,70%,45%)" : "hsl(215,20%,25%)",
+                  background: state === "completed" ? "hsl(140,40%,12%)" : state === "active" ? "hsl(45,50%,12%)" : "hsl(var(--background))"
+                }}>
+                  <span className="font-display text-sm font-bold" style={{
+                    color: state === "completed" ? "hsl(140,60%,55%)" : state === "active" ? "hsl(45,75%,60%)" : "hsl(215,15%,40%)"
+                  }}>{ground.id}</span>
+                </div>
+
+                {isLeft && <div className="hidden sm:block" />}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t border-border/30">
+        {[
+          { state: "completed", color: "hsl(140,60%,55%)", label: "Завершена" },
+          { state: "active", color: "hsl(45,75%,60%)", label: "В процессе" },
+          { state: "available", color: "hsl(45,60%,50%)", label: "Доступна" },
+          { state: "locked", color: "hsl(215,15%,40%)", label: "Заблокирована" },
+        ].map(l => (
+          <div key={l.state} className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: l.color }} />
+            <span className="font-body text-[10px] text-muted-foreground">{l.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── ARCHIVE PAGE ─────────────────────────────────────────────────────────────
+function ArchivePage({ profile }: { profile: ProfileData }) {
+  const [data, setData] = useState<{ progress: (ProgressItem & { started_at?: string; completed_at?: string })[]; certificates: CertItem[]; actions: ActionLog[]; stats: ArchiveStats } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"timeline" | "certs" | "log">("timeline");
+
+  const token = localStorage.getItem(TOKEN_KEY) || "";
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      const res = await fetch(`${PROGRESS_URL}?action=get_archive`, { headers: { "X-Session-Token": token } });
+      if (res.ok) setData(await res.json());
+      setLoading(false);
+    })();
+  }, [token]);
+
+  const actionLabel = (action: string) => (({
+    update_profile: "Обновил профиль",
+    change_password: "Изменил пароль",
+    start_ground: "Начал площадку",
+    complete_module: "Завершил модуль",
+    view_material: "Просмотрел материал",
+  } as Record<string, string>)[action] || action);
+
+  const actionIcon = (action: string) => (({
+    update_profile: "User", change_password: "Lock", start_ground: "Play",
+    complete_module: "CheckCircle", view_material: "Eye",
+  } as Record<string, string>)[action] || "Activity");
+
+  return (
+    <div className="max-w-5xl mx-auto px-6 py-16">
+      <div className="mb-10">
+        <div className="ornament mb-1">✦</div>
+        <h1 className="font-display text-4xl font-light">Архив обучения</h1>
+        <p className="font-body text-sm text-muted-foreground mt-1">Полная история вашего пути в Академии</p>
+      </div>
+
+      {loading && <div className="text-center py-20 font-body text-muted-foreground">Загружаем историю...</div>}
+
+      {!loading && data && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+            {[
+              { icon: "BookCheck", label: "Площадок завершено", value: data.stats.completed_grounds, suffix: "из 5" },
+              { icon: "Award", label: "Сертификатов", value: data.stats.certificates_count, suffix: "" },
+              { icon: "Layers", label: "Модулей пройдено", value: data.stats.total_modules_done, suffix: "" },
+              { icon: "Flame", label: "Активных курсов", value: data.stats.active_grounds_count, suffix: "" },
+            ].map(s => (
+              <div key={s.label} className="card-luxury rounded-lg p-4">
+                <Icon name={s.icon} size={18} className="mb-2" style={{ color: "hsl(45, 70%, 55%)" }} />
+                <div className="font-display text-2xl font-light mb-0.5" style={{ color: "hsl(45, 80%, 68%)" }}>
+                  {s.value}<span className="text-base ml-1 text-muted-foreground">{s.suffix}</span>
+                </div>
+                <div className="font-body text-xs text-muted-foreground">{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex border-b border-border/40 mb-6 gap-1">
+            {([
+              { key: "timeline", label: "Прогресс по курсам", icon: "BarChart2" },
+              { key: "certs", label: "Сертификаты", icon: "Award" },
+              { key: "log", label: "История действий", icon: "ScrollText" },
+            ] as const).map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                className={`flex items-center gap-2 px-4 py-3 font-body text-xs uppercase tracking-wide border-b-2 transition-all ${tab === t.key ? "border-amber-600" : "border-transparent text-muted-foreground"}`}
+                style={tab === t.key ? { color: "hsl(45, 75%, 60%)" } : {}}>
+                <Icon name={t.icon} size={13} />{t.label}
+              </button>
+            ))}
+          </div>
+
+          {tab === "timeline" && (
+            <div className="space-y-4">
+              {data.progress.length === 0 && (
+                <div className="text-center py-12">
+                  <Icon name="BookOpen" size={32} className="mx-auto mb-3 opacity-30" />
+                  <p className="font-body text-muted-foreground">Вы ещё не начали обучение</p>
+                </div>
+              )}
+              {GROUNDS.map(g => {
+                const prog = data.progress.find(p => p.ground_id === g.id);
+                return (
+                  <div key={g.id} className={`card-luxury rounded-lg p-5 ${!prog ? "opacity-40" : ""}`}>
+                    <div className="flex items-center gap-4 mb-3">
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0`}
+                        style={prog?.status === "completed" ? { background: "rgba(50,160,70,0.2)", border: "1px solid rgba(50,160,70,0.3)" } :
+                               prog ? { background: "linear-gradient(135deg, hsl(45,80%,55%), hsl(36,70%,42%))" } :
+                               { background: "rgba(200,200,200,0.08)" }}>
+                        <Icon name={prog?.status === "completed" ? "CheckCircle" : prog ? g.icon : "Lock"}
+                          size={16}
+                          className={prog && prog.status !== "completed" ? "text-stone-900" : ""}
+                          style={prog?.status === "completed" ? { color: "hsl(140,60%,55%)" } : {}}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-display text-base" style={{ color: "hsl(45, 75%, 65%)" }}>{g.title}</span>
+                          {prog?.status === "completed" && <span className="status-badge bg-green-900/20 border border-green-700/30 text-green-500 text-[10px]">Завершена</span>}
+                          {prog?.status === "active" && <span className="status-badge bg-amber-900/20 border border-amber-700/30 text-amber-500 text-[10px]">В процессе</span>}
+                          {!prog && <span className="status-badge bg-muted/20 border border-border/30 text-muted-foreground text-[10px]">Не начата</span>}
+                        </div>
+                        {prog && <div className="font-body text-xs text-muted-foreground mt-0.5">Модуль {prog.current_module} из {prog.total_modules}</div>}
+                      </div>
+                      {prog && <div className="font-display text-xl font-light" style={{ color: "hsl(45, 80%, 65%)" }}>{prog.percent}%</div>}
+                    </div>
+                    {prog && (
+                      <>
+                        <div className="h-1.5 bg-muted/30 rounded-full overflow-hidden mb-2">
+                          <div className="h-full progress-bar-gold rounded-full" style={{ width: `${prog.percent}%` }} />
+                        </div>
+                        <div className="flex gap-4 font-body text-[10px] text-muted-foreground">
+                          {prog.started_at && <span>Начата: {new Date(prog.started_at).toLocaleDateString("ru-RU")}</span>}
+                          {prog.completed_at && <span>Завершена: {new Date(prog.completed_at).toLocaleDateString("ru-RU")}</span>}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {tab === "certs" && (
+            <div>
+              {data.certificates.length === 0 ? (
+                <div className="text-center py-12">
+                  <Icon name="Award" size={32} className="mx-auto mb-3 opacity-20" />
+                  <p className="font-body text-muted-foreground">Сертификатов пока нет</p>
+                  <p className="font-body text-xs text-muted-foreground/70 mt-1">Завершите первую площадку, чтобы получить сертификат</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {data.certificates.map(c => (
+                    <div key={c.ground_id} className="card-luxury rounded-xl p-6 border border-amber-700/30 shimmer">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl gold-gradient flex items-center justify-center flex-shrink-0">
+                          <Icon name="Award" size={22} className="text-stone-900" />
+                        </div>
+                        <div>
+                          <div className="font-body text-[10px] uppercase tracking-widest text-muted-foreground mb-0.5">Сертификат</div>
+                          <div className="font-display text-lg font-medium" style={{ color: "hsl(45, 80%, 65%)" }}>{c.ground_title}</div>
+                          <div className="font-body text-xs text-muted-foreground mt-0.5">
+                            Получен: {new Date(c.issued_at).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                          </div>
+                          <div className="font-body text-xs mt-1" style={{ color: "hsl(45, 70%, 55%)" }}>{profile.user.name}</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === "log" && (
+            <div className="space-y-2">
+              {data.actions.length === 0 && (
+                <div className="text-center py-12">
+                  <Icon name="ScrollText" size={32} className="mx-auto mb-3 opacity-20" />
+                  <p className="font-body text-muted-foreground">История действий пуста</p>
+                </div>
+              )}
+              {data.actions.map((a, i) => (
+                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-muted/10 border border-border/20 hover:border-border/40 transition-colors">
+                  <div className="w-7 h-7 rounded flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: "rgba(200,160,40,0.08)" }}>
+                    <Icon name={actionIcon(a.action)} size={13} style={{ color: "hsl(45, 65%, 55%)" }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-body text-sm text-foreground/80">{actionLabel(a.action)}</div>
+                    {a.details && <div className="font-body text-xs text-muted-foreground truncate">{a.details}</div>}
+                  </div>
+                  <div className="font-body text-[10px] text-muted-foreground flex-shrink-0">
+                    {new Date(a.created_at).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

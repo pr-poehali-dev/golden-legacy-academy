@@ -34,6 +34,24 @@
       "expectedStatus": 401,
       "expectedBody": {"error": "string"},
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "Update profile without token",
+      "method": "POST",
+      "path": "/?action=update_profile",
+      "body": {"name": "Test"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Change password without token",
+      "method": "POST",
+      "path": "/?action=change_password",
+      "body": {"current_password": "old", "new_password": "new123", "confirm_password": "new123"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
     }
   ]
 }
