@@ -214,31 +214,67 @@ export default function Index() {
 }
 
 // ─── HOME PAGE ────────────────────────────────────────────────────────────────
+const HERO_IMG = "https://cdn.poehali.dev/projects/e7a92d70-13fa-4fe1-b427-04d5de72d5d4/bucket/8509dc14-455a-411c-8604-21de621dfba8.jpg";
+
 function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) => void; setShowLogin: (v: boolean) => void; isLoggedIn: boolean }) {
   return (
     <div>
-      <section className="relative min-h-[85vh] flex items-center">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(180,140,30,0.07) 0%, transparent 70%)" }} />
-        </div>
-        <div className="max-w-7xl mx-auto px-6 py-20 w-full">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="flex justify-center mb-6">
+      {/* HERO — split layout */}
+      <section className="relative min-h-[90vh] flex items-stretch overflow-hidden">
+        {/* Left — text */}
+        <div className="relative z-10 flex items-center w-full lg:w-1/2 px-6 sm:px-12 lg:px-16 py-20">
+          <div className="max-w-lg">
+            <div className="mb-6">
               <span className="status-badge border border-amber-700/40" style={{ color: "hsl(40,70%,55%)" }}>✦ Академия Наставничества ✦</span>
             </div>
-            <h1 className="font-display text-5xl sm:text-6xl md:text-7xl font-light mb-6 leading-tight animate-fade-in">
+            <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-light mb-6 leading-tight animate-fade-in">
               <span className="gold-text-gradient">Золотое</span><br />
               <span className="text-foreground/90">Наследие</span>
             </h1>
-            <div className="divider-gold w-24 mx-auto mb-6" />
-            <p className="font-body text-base sm:text-lg text-muted-foreground leading-relaxed mb-10 max-w-xl mx-auto">
+            <div className="divider-gold w-20 mb-6" />
+            <p className="font-body text-base text-muted-foreground leading-relaxed mb-10">
               Пять ступеней мастерства, которые превратят ваш опыт в вечное наследие. Система наставничества, проверенная временем.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4">
               <button onClick={() => setPage("grounds")} className="btn-gold px-8 py-3 rounded">Начать обучение</button>
               {!isLoggedIn && <button onClick={() => setShowLogin(true)} className="btn-outline-gold px-8 py-3 rounded">Войти в кабинет</button>}
             </div>
+
+            {/* Mini stats */}
+            <div className="flex gap-8 mt-12 pt-8 border-t border-border/30">
+              {[{ value: "247", label: "Выпускников" }, { value: "5", label: "Ступеней" }, { value: "12", label: "Лет традиций" }].map((s) => (
+                <div key={s.label}>
+                  <div className="font-display text-2xl font-light gold-text-gradient">{s.value}</div>
+                  <div className="font-body text-[10px] text-muted-foreground uppercase tracking-wide">{s.label}</div>
+                </div>
+              ))}
+            </div>
           </div>
+        </div>
+
+        {/* Right — image */}
+        <div className="hidden lg:block absolute right-0 top-0 w-1/2 h-full">
+          {/* Fade overlay left edge */}
+          <div className="absolute inset-y-0 left-0 w-32 z-10"
+            style={{ background: "linear-gradient(to right, hsl(20,14%,6%) 0%, transparent 100%)" }} />
+          {/* Fade overlay bottom */}
+          <div className="absolute inset-x-0 bottom-0 h-32 z-10"
+            style={{ background: "linear-gradient(to top, hsl(20,14%,6%) 0%, transparent 100%)" }} />
+          <img
+            src={HERO_IMG}
+            alt="Академия Золотое Наследие"
+            className="w-full h-full object-cover object-center"
+            style={{ filter: "brightness(0.85) saturate(0.9)" }}
+          />
+          {/* Gold border accent */}
+          <div className="absolute inset-y-8 left-0 w-px"
+            style={{ background: "linear-gradient(to bottom, transparent, hsl(45,70%,45%), transparent)" }} />
+        </div>
+
+        {/* Mobile bg image */}
+        <div className="lg:hidden absolute inset-0 z-0">
+          <img src={HERO_IMG} alt="" className="w-full h-full object-cover object-center opacity-15" />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(16,12,8,0.6) 0%, rgba(16,12,8,0.95) 100%)" }} />
         </div>
       </section>
 
@@ -277,20 +313,60 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
 
       <section className="border-t border-border/40 py-20">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { icon: "Award", title: "Сертификаты", desc: "По завершении каждой площадки вы получаете именной сертификат — подтверждение вашего мастерства" },
-              { icon: "Shield", title: "Закрытый клуб", desc: "Доступ к закрытому сообществу наставников с эксклюзивными материалами и бонусами" },
-              { icon: "Users", title: "Личный наставник", desc: "Каждый участник получает поддержку опытного наставника на протяжении всего обучения" },
-            ].map((feat) => (
-              <div key={feat.title} className="card-luxury rounded-lg p-6 hover:scale-[1.02] transition-all duration-300">
-                <div className="w-10 h-10 rounded gold-gradient flex items-center justify-center mb-4">
-                  <Icon name={feat.icon} size={18} className="text-stone-900" />
+          {/* Image + text row */}
+          <div className="flex flex-col lg:flex-row gap-10 items-center mb-16">
+            <div className="w-full lg:w-2/5 flex-shrink-0">
+              <div className="relative rounded-xl overflow-hidden" style={{ aspectRatio: "4/5" }}>
+                <img
+                  src={HERO_IMG}
+                  alt="Золотое Наследие — пространство знаний"
+                  className="w-full h-full object-cover object-center"
+                  style={{ filter: "brightness(0.9) saturate(0.85)" }}
+                />
+                {/* Gold frame accent */}
+                <div className="absolute inset-0 rounded-xl" style={{ boxShadow: "inset 0 0 0 1px rgba(180,140,40,0.3)" }} />
+                {/* Bottom overlay with tagline */}
+                <div className="absolute bottom-0 inset-x-0 p-5"
+                  style={{ background: "linear-gradient(to top, rgba(10,8,5,0.9) 0%, transparent 100%)" }}>
+                  <div className="ornament text-sm mb-1">✦</div>
+                  <div className="font-display text-lg font-light" style={{ color: "hsl(45, 85%, 70%)" }}>
+                    Пространство, созданное для роста
+                  </div>
+                  <div className="font-body text-xs text-muted-foreground mt-0.5 tracking-wide">
+                    Академия наставничества · с 2014 года
+                  </div>
                 </div>
-                <h3 className="font-display text-xl font-medium mb-2" style={{ color: "hsl(45, 80%, 65%)" }}>{feat.title}</h3>
-                <p className="font-body text-sm text-muted-foreground leading-relaxed">{feat.desc}</p>
               </div>
-            ))}
+            </div>
+
+            <div className="flex-1">
+              <div className="ornament mb-3">✦</div>
+              <h2 className="font-display text-4xl lg:text-5xl font-light mb-4 leading-tight">
+                Место, где опыт<br />
+                <span className="gold-text-gradient">становится наследием</span>
+              </h2>
+              <div className="divider-gold w-20 mb-5" />
+              <p className="font-body text-sm text-muted-foreground leading-relaxed mb-6 max-w-lg">
+                Мы создали систему, в которой каждый эксперт может структурировать свои знания, передать их следующему поколению и оставить след, который будет жить в людях.
+              </p>
+              <div className="space-y-4">
+                {[
+                  { icon: "Award", title: "Сертификаты", desc: "Именной документ после каждой из пяти ступеней" },
+                  { icon: "Shield", title: "Закрытый клуб", desc: "Эксклюзивное сообщество с бонусами по статусу" },
+                  { icon: "Users", title: "Личный наставник", desc: "Поддержка опытного ментора на всём пути" },
+                ].map((feat) => (
+                  <div key={feat.title} className="flex items-start gap-4 p-4 rounded-lg border border-border/30 hover:border-amber-800/40 transition-all">
+                    <div className="w-8 h-8 rounded gold-gradient flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Icon name={feat.icon} size={15} className="text-stone-900" />
+                    </div>
+                    <div>
+                      <div className="font-display text-base font-medium mb-0.5" style={{ color: "hsl(45, 80%, 65%)" }}>{feat.title}</div>
+                      <div className="font-body text-xs text-muted-foreground">{feat.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
