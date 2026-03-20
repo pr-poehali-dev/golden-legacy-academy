@@ -152,7 +152,7 @@ def handler(event: dict, context) -> dict:
         cur = conn.cursor(cursor_factory=RealDictCursor)
 
         cur.execute(
-            f"""SELECT u.id, u.name, u.email, u.status, u.level, u.created_at
+            f"""SELECT u.id, u.name, u.email, u.status, u.level, u.is_admin, u.created_at
                 FROM {SCHEMA}.users u
                 JOIN {SCHEMA}.sessions s ON s.user_id = u.id
                 WHERE s.token = %s AND s.expires_at > NOW()""",

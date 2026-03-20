@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import Icon from "@/components/ui/icon";
 
 const AUTH_URL = "https://functions.poehali.dev/e6da7fcf-5b58-4d23-bcb3-2e96a22c0726";
+const ADMIN_URL = "https://functions.poehali.dev/1766177a-c2da-45c4-ab5b-e61d5b8f9608";
 const TOKEN_KEY = "gn_session_token";
+const LOGO_IMG = "https://cdn.poehali.dev/projects/e7a92d70-13fa-4fe1-b427-04d5de72d5d4/bucket/104ffa8d-3640-40b5-858a-6ba7f7a2f794.jpg";
 
 type Page = "home" | "grounds" | "cabinet" | "progress" | "club" | "contacts";
 
@@ -12,6 +14,7 @@ interface UserData {
   email: string;
   status: string;
   level: number;
+  is_admin: boolean;
   created_at: string;
 }
 
@@ -116,9 +119,7 @@ export default function Index() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-16">
             <button onClick={() => setPage("home")} className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full gold-gradient flex items-center justify-center flex-shrink-0">
-                <Icon name="Star" size={14} className="text-stone-900" />
-              </div>
+              <img src={LOGO_IMG} alt="Золотое Наследие" className="w-10 h-10 rounded-full object-cover object-center flex-shrink-0" style={{ filter: "brightness(1.05) saturate(1.1)" }} />
               <div className="hidden sm:block">
                 <div className="font-display text-lg leading-tight" style={{ color: "hsl(45, 90%, 68%)" }}>Золотое Наследие</div>
                 <div className="font-body text-[10px] tracking-widest text-muted-foreground uppercase">Академия наставничества</div>
@@ -200,9 +201,7 @@ export default function Index() {
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full gold-gradient flex items-center justify-center">
-                <Icon name="Star" size={10} className="text-stone-900" />
-              </div>
+              <img src={LOGO_IMG} alt="ЗН" className="w-7 h-7 rounded-full object-cover object-center" />
               <span className="font-display text-sm" style={{ color: "hsl(45, 70%, 55%)" }}>Академия Золотое Наследие</span>
             </div>
             <p className="font-body text-xs text-muted-foreground tracking-wide">© 2026 — Все права защищены</p>
@@ -224,7 +223,10 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
         {/* Left — text */}
         <div className="relative z-10 flex items-center w-full lg:w-1/2 px-6 sm:px-12 lg:px-16 py-20">
           <div className="max-w-lg">
-            <div className="mb-6">
+            {/* Logo */}
+            <div className="mb-6 flex items-center gap-4">
+              <img src={LOGO_IMG} alt="Золотое Наследие" className="w-16 h-16 rounded-full object-cover object-center border border-amber-700/30"
+                style={{ boxShadow: "0 0 24px rgba(180,140,30,0.2)" }} />
               <span className="status-badge border border-amber-700/40" style={{ color: "hsl(40,70%,55%)" }}>✦ Академия Наставничества ✦</span>
             </div>
             <h1 className="font-display text-5xl sm:text-6xl lg:text-7xl font-light mb-6 leading-tight animate-fade-in">
@@ -374,10 +376,61 @@ function HomePage({ setPage, setShowLogin, isLoggedIn }: { setPage: (p: Page) =>
   );
 }
 
+// Контент программ курсов
+const GROUND_PROGRAMS: Record<number, { week: string; topic: string }[]> = {
+  1: [
+    { week: "Неделя 1–2", topic: "Философия наставничества: ценности и миссия" },
+    { week: "Неделя 2–3", topic: "Установление доверия и создание безопасной среды" },
+    { week: "Неделя 3–4", topic: "Первая встреча с подопечным: диагностика и контакт" },
+    { week: "Неделя 4", topic: "Обратная связь как инструмент роста. Итоговый проект" },
+  ],
+  2: [
+    { week: "Неделя 1", topic: "Психология мотивации и внутренние движущие силы" },
+    { week: "Неделя 2", topic: "Зоны роста и барьеры развития личности" },
+    { week: "Неделя 3–4", topic: "Работа с сопротивлением и страхами" },
+    { week: "Неделя 4–5", topic: "Раскрытие потенциала через системное мышление" },
+  ],
+  3: [
+    { week: "Неделя 1–2", topic: "Авторские методики структурирования знаний" },
+    { week: "Неделя 2–3", topic: "Создание персональных программ развития" },
+    { week: "Неделя 3–5", topic: "Инструменты наставника: коучинг, менторинг, тьюторство" },
+    { week: "Неделя 5–6", topic: "Оценка эффективности и корректировка программы" },
+  ],
+  4: [
+    { week: "Неделя 1–2", topic: "Природа лидерства. Сила личного примера" },
+    { week: "Неделя 2–3", topic: "Построение экспертной репутации в своей области" },
+    { week: "Неделя 3–4", topic: "Расширение круга влияния и нетворкинг" },
+    { week: "Неделя 4–5", topic: "Лидер как наставник: передача культуры и ценностей" },
+  ],
+  5: [
+    { week: "Неделя 1–2", topic: "Архитектура собственной школы наставничества" },
+    { week: "Неделя 2–4", topic: "Подготовка наставников следующего уровня" },
+    { week: "Неделя 4–6", topic: "Создание методологии и авторских программ" },
+    { week: "Неделя 6–8", topic: "Формирование наследия. Итоговая аттестация" },
+  ],
+};
+
 // ─── GROUNDS PAGE ─────────────────────────────────────────────────────────────
 function GroundsPage({ isLoggedIn, setShowLogin, profile }: { isLoggedIn: boolean; setShowLogin: (v: boolean) => void; profile: ProfileData | null }) {
   const [selected, setSelected] = useState<number | null>(null);
+  const [programModal, setProgramModal] = useState<number | null>(null);
+  const [startModal, setStartModal] = useState<number | null>(null);
+  const [starting, setStarting] = useState(false);
   const completedGrounds = profile?.completedGrounds ?? 0;
+
+  const handleStartGround = async (groundId: number) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) return;
+    setStarting(true);
+    await fetch(`${ADMIN_URL}?action=start_ground`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify({ user_id: profile?.user.id, ground_id: groundId }),
+    });
+    setStarting(false);
+    setStartModal(null);
+    window.location.reload();
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-16">
@@ -419,8 +472,19 @@ function GroundsPage({ isLoggedIn, setShowLogin, profile }: { isLoggedIn: boolea
                   <div className="flex flex-col sm:flex-row gap-3">
                     {isAvailable ? (
                       <>
-                        <button className="btn-gold px-6 py-2.5 rounded">{inProgress ? "Продолжить обучение" : "Начать площадку"}</button>
-                        <button className="btn-outline-gold px-6 py-2.5 rounded">Программа курса</button>
+                        <button
+                          className="btn-gold px-6 py-2.5 rounded"
+                          onClick={() => {
+                            if (!isLoggedIn) { setShowLogin(true); return; }
+                            if (inProgress) return;
+                            setStartModal(g.id);
+                          }}
+                        >
+                          {inProgress ? "✓ Обучение идёт" : "Начать площадку"}
+                        </button>
+                        <button className="btn-outline-gold px-6 py-2.5 rounded" onClick={() => setProgramModal(g.id)}>
+                          Программа курса
+                        </button>
                       </>
                     ) : (
                       <div className="flex items-center gap-2 text-muted-foreground">
@@ -444,6 +508,221 @@ function GroundsPage({ isLoggedIn, setShowLogin, profile }: { isLoggedIn: boolea
           <button onClick={() => setShowLogin(true)} className="btn-gold px-8 py-3 rounded">Зарегистрироваться</button>
         </div>
       )}
+
+      {/* Modal: программа курса */}
+      {programModal !== null && (() => {
+        const g = GROUNDS.find(gr => gr.id === programModal)!;
+        const program = GROUND_PROGRAMS[programModal] || [];
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setProgramModal(null)} />
+            <div className="relative card-luxury rounded-lg p-6 sm:p-8 w-full max-w-lg animate-scale-in">
+              <button onClick={() => setProgramModal(null)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"><Icon name="X" size={18} /></button>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-full gold-gradient flex items-center justify-center flex-shrink-0">
+                  <Icon name={g.icon} size={16} className="text-stone-900" />
+                </div>
+                <div>
+                  <div className="font-body text-[10px] tracking-widest text-muted-foreground uppercase">Площадка {g.id}</div>
+                  <div className="font-display text-xl font-medium" style={{ color: "hsl(45, 80%, 68%)" }}>{g.title}</div>
+                </div>
+              </div>
+              <div className="divider-gold mb-4" />
+              <div className="flex gap-4 mb-5 font-body text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><Icon name="BookOpen" size={13} />{g.modules} модулей</span>
+                <span className="flex items-center gap-1"><Icon name="Clock" size={13} />{g.duration}</span>
+              </div>
+              <div className="space-y-3">
+                {program.map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded bg-muted/10 border border-border/30">
+                    <div className="w-5 h-5 rounded-full gold-gradient flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <span className="font-body text-[9px] font-bold text-stone-900">{i + 1}</span>
+                    </div>
+                    <div>
+                      <div className="font-body text-[10px] text-muted-foreground tracking-wide uppercase mb-0.5">{item.week}</div>
+                      <div className="font-body text-sm text-foreground/80">{item.topic}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => { setProgramModal(null); if (isLoggedIn) setStartModal(g.id); else setShowLogin(true); }}
+                className="btn-gold w-full py-3 rounded mt-5">
+                Начать эту площадку
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal: подтверждение старта */}
+      {startModal !== null && (() => {
+        const g = GROUNDS.find(gr => gr.id === startModal)!;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setStartModal(null)} />
+            <div className="relative card-luxury rounded-lg p-6 sm:p-8 w-full max-w-sm animate-scale-in text-center">
+              <button onClick={() => setStartModal(null)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"><Icon name="X" size={18} /></button>
+              <div className="w-14 h-14 rounded-full gold-gradient flex items-center justify-center mx-auto mb-4">
+                <Icon name={g.icon} size={22} className="text-stone-900" />
+              </div>
+              <h3 className="font-display text-2xl mb-2" style={{ color: "hsl(45, 80%, 68%)" }}>Начать площадку?</h3>
+              <p className="font-body text-sm text-muted-foreground mb-5">
+                Вы начнёте обучение на площадке <span style={{ color: "hsl(45, 75%, 65%)" }}>«{g.title}»</span>.<br />Продолжительность — {g.duration}.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setStartModal(null)} className="btn-outline-gold flex-1 py-2.5 rounded">Отмена</button>
+                <button onClick={() => handleStartGround(g.id)} disabled={starting} className="btn-gold flex-1 py-2.5 rounded disabled:opacity-60">
+                  {starting ? "Запускаем..." : "Начать!"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ─── ADMIN PANEL ─────────────────────────────────────────────────────────────
+interface AdminUser {
+  id: number; name: string; email: string; status: string; level: number;
+  is_admin: boolean; cert_count: number;
+  progress: { ground_id: number; percent: number; status: string }[];
+  certificates: { ground_id: number }[];
+}
+
+function AdminPanel() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState("");
+  const [working, setWorking] = useState(false);
+
+  const token = localStorage.getItem(TOKEN_KEY) || "";
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`${ADMIN_URL}?action=users`, { headers: { "X-Session-Token": token } });
+    if (res.ok) { const d = await res.json(); setUsers(d.users || []); }
+    setLoading(false);
+  }, [token]);
+
+  useEffect(() => { loadUsers(); }, [loadUsers]);
+
+  const issueCert = async (userId: number, groundId: number) => {
+    setWorking(true); setMsg("");
+    const res = await fetch(`${ADMIN_URL}?action=issue_cert`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify({ user_id: userId, ground_id: groundId }),
+    });
+    const d = await res.json();
+    setMsg(d.message || d.error || "");
+    setWorking(false);
+    loadUsers();
+  };
+
+  const setProgress = async (userId: number, groundId: number, percent: number) => {
+    setWorking(true); setMsg("");
+    const module = Math.ceil((percent / 100) * (GROUNDS.find(g => g.id === groundId)?.modules || 8));
+    const res = await fetch(`${ADMIN_URL}?action=set_progress`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Session-Token": token },
+      body: JSON.stringify({ user_id: userId, ground_id: groundId, percent, current_module: module }),
+    });
+    const d = await res.json();
+    setMsg(d.message || d.error || "");
+    setWorking(false);
+    loadUsers();
+  };
+
+  return (
+    <div className="card-luxury rounded-lg p-6 lg:col-span-3 border border-amber-800/40">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-8 h-8 rounded gold-gradient flex items-center justify-center">
+          <Icon name="ShieldCheck" size={15} className="text-stone-900" />
+        </div>
+        <h3 className="font-display text-xl font-medium" style={{ color: "hsl(45, 80%, 68%)" }}>Панель Администратора</h3>
+      </div>
+
+      {msg && <div className="mb-4 p-3 rounded bg-green-900/20 border border-green-700/30 font-body text-xs text-green-400">{msg}</div>}
+
+      {loading ? (
+        <div className="font-body text-sm text-muted-foreground">Загрузка участников...</div>
+      ) : users.length === 0 ? (
+        <div className="font-body text-sm text-muted-foreground">Участников пока нет</div>
+      ) : (
+        <div className="space-y-4">
+          {users.filter(u => !u.is_admin).map((u) => (
+            <div key={u.id} className="p-4 rounded-lg bg-muted/10 border border-border/30">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="font-display text-base font-medium" style={{ color: "hsl(45, 75%, 65%)" }}>{u.name}</div>
+                  <div className="font-body text-xs text-muted-foreground">{u.email} · {u.status}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="status-badge bg-amber-900/20 border border-amber-800/30 text-amber-600/80 text-[9px]">
+                    Ур. {u.level}
+                  </span>
+                  <span className="font-body text-xs text-muted-foreground">{u.cert_count} серт.</span>
+                </div>
+              </div>
+
+              {/* Площадки */}
+              <div className="grid grid-cols-5 gap-2">
+                {GROUNDS.map((g) => {
+                  const prog = u.progress?.find((p) => p.ground_id === g.id);
+                  const cert = u.certificates?.find((c) => c.ground_id === g.id);
+                  return (
+                    <div key={g.id} className="text-center p-2 rounded bg-muted/10 border border-border/20">
+                      <div className="font-body text-[9px] text-muted-foreground uppercase mb-1">П{g.id}</div>
+                      <div className={`w-6 h-6 rounded-full mx-auto mb-1 flex items-center justify-center ${cert ? "gold-gradient" : prog ? "border border-amber-700/40 bg-transparent" : "bg-muted/30"}`}>
+                        <Icon name={cert ? "Award" : prog ? g.icon : "Lock"} size={11}
+                          className={cert ? "text-stone-900" : prog ? "" : "text-muted-foreground/30"}
+                          style={(!cert && prog) ? { color: "hsl(45,70%,55%)" } : {}}
+                        />
+                      </div>
+                      {prog && <div className="font-body text-[9px] text-muted-foreground">{prog.percent}%</div>}
+                      <div className="flex flex-col gap-1 mt-1.5">
+                        {!cert && (
+                          <button
+                            onClick={() => issueCert(u.id, g.id)}
+                            disabled={working}
+                            className="font-body text-[8px] rounded px-1 py-0.5 border border-amber-700/40 hover:bg-amber-900/20 transition-all disabled:opacity-40"
+                            style={{ color: "hsl(45,70%,55%)" }}
+                            title="Выдать сертификат"
+                          >
+                            Серт.
+                          </button>
+                        )}
+                        {!prog && !cert && (
+                          <button
+                            onClick={() => setProgress(u.id, g.id, 50)}
+                            disabled={working}
+                            className="font-body text-[8px] rounded px-1 py-0.5 border border-border/40 hover:bg-muted/20 transition-all disabled:opacity-40 text-muted-foreground"
+                            title="Начать площадку (50%)"
+                          >
+                            50%
+                          </button>
+                        )}
+                        {prog && prog.status !== "completed" && (
+                          <button
+                            onClick={() => setProgress(u.id, g.id, 100)}
+                            disabled={working}
+                            className="font-body text-[8px] rounded px-1 py-0.5 border border-green-800/40 hover:bg-green-900/20 transition-all disabled:opacity-40 text-green-500/70"
+                            title="Завершить площадку"
+                          >
+                            100%
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -459,6 +738,12 @@ function CabinetPage({ profile }: { profile: ProfileData }) {
       <div className="mb-10">
         <div className="ornament mb-1">✦</div>
         <h1 className="font-display text-4xl font-light">Личный Кабинет</h1>
+        {user.is_admin && (
+          <div className="mt-1 flex items-center gap-1.5">
+            <Icon name="ShieldCheck" size={13} style={{ color: "hsl(45,70%,55%)" }} />
+            <span className="font-body text-xs" style={{ color: "hsl(45,70%,55%)" }}>Администратор</span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -544,6 +829,9 @@ function CabinetPage({ profile }: { profile: ProfileData }) {
             })}
           </div>
         </div>
+
+        {/* Admin Panel */}
+        {user.is_admin && <AdminPanel />}
       </div>
     </div>
   );
